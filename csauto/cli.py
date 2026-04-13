@@ -283,6 +283,7 @@ def parse_arguments(
     subparsers.add_parser("disable-telemetry", help="Disable anonymous usage telemetry.")
     ping_parser = subparsers.add_parser("_telemetry-ping")
     ping_parser.add_argument("event_type", type=int)
+    ping_parser.add_argument("id_docker")
 
     # Backward compatibility: allow legacy call without subcommand.
     commands = {
@@ -457,7 +458,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "_telemetry-ping":
             from .telemetry import send_event
 
-            send_event(args.event_type, block=True)
+            send_event(args.event_type, block=True, id_docker=args.id_docker)
         else:
             raise ValueError("Unknown command.")
     except Exception as exc:

@@ -170,20 +170,24 @@ VERSION=$("$CSAUTO_BIN" --version 2>&1)
 success "Installed: $VERSION"
 
 # -- Telemetry --
-if [ "$MODE" = "fresh" ]; then
-    if $NO_TELEMETRY; then
-        info "Telemetry disabled by --no-telemetry flag"
-        "$PYTHON" -c "
+case "$MODE" in
+    fresh|update)
+        if $NO_TELEMETRY; then
+            info "Telemetry disabled by --no-telemetry flag"
+            "$PYTHON" -c "
 import json, uuid, pathlib
 d = pathlib.Path.home() / '.local' / 'share' / 'csauto'
 d.mkdir(parents=True, exist_ok=True)
 f = d / 'telemetry.json'
 f.write_text(json.dumps({'user_id': str(uuid.uuid4()), 'enabled': False}, indent=2))
 " 2>/dev/null || true
-    else
-        "$CSAUTO_BIN" _telemetry-ping 3 2>/dev/null || true
-    fi
-fi
+        else
+            PING_TAG="install"
+            [ "$MODE" = "update" ] && PING_TAG="update"
+            "$CSAUTO_BIN" _telemetry-ping 3 "$PING_TAG" 2>/dev/null || true
+        fi
+        ;;
+esac
 
 # -- Set up shell alias (venv mode only) --
 if $USE_VENV; then
