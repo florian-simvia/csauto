@@ -48,6 +48,88 @@
 }
 </script>
 
+<!-- JSON-LD FAQ -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is csauto?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "csauto is an open-source Python tool that automates code_saturne CFD simulation campaigns. It covers the full workflow: batch case generation from a Design of Experiments (DOE) CSV file, execution on local machines or HPC clusters via Slurm, and real-time monitoring of residual convergence, probe signals, solver errors, and compute performance through a web dashboard."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I run a parametric study with code_saturne?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Define your parameter combinations in a CSV file (one row per case, one column per parameter). Create a template case directory where input files use placeholders like {u_inlet} or {turbulence_model}. Run csauto prepare to generate all cases, then csauto serve to launch and monitor them from a single web interface."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does csauto work with Slurm, Docker, and Singularity?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. csauto supports four execution backends: native code_saturne binary, Docker containers, Singularity/Apptainer images (common on HPC clusters), and automatic detection of the best available runtime. Slurm job submission is built in via sbatch, with job status tracked through squeue."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does csauto monitor simulation convergence?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The web dashboard plots residuals and probe signals in real time for all running cases. You can identify diverging, stalled, or converged simulations at a glance, mark convergence status, and compare residual histories across cases side by side."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How many simulation cases can csauto handle?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "csauto can generate and manage hundreds of cases from a single CSV and template directory. Each row in your DOE file becomes a fully resolved simulation case with its own input files, logs, and results."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the system requirements?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Python 3.11 or higher and at least one code_saturne runtime: a native binary installed on your machine, a Docker image, or a Singularity/Apptainer .sif image. The core CLI has zero external Python dependencies. The web dashboard adds only FastAPI and uvicorn."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I compare results between simulation cases?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. csauto provides side-by-side comparison of input files, residual curves, probe data, and performance metrics between any two cases. This helps identify the impact of specific parameter changes across your study."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment automatiser des simulations code_saturne ?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Avec csauto, vous definissez vos parametres dans un fichier CSV (plan d'experiences), creez un repertoire template avec des marqueurs de substitution, puis lancez csauto prepare pour generer tous les cas. csauto serve demarre ensuite un tableau de bord web pour lancer, surveiller et comparer les simulations en temps reel."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is csauto free and open-source?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. csauto is released under the GPL-3.0 license and developed by Simvia SAS. The source code is available on GitHub. code_saturne itself is also open-source under GPL-2.0, developed by EDF R&D."
+      }
+    }
+  ]
+}
+</script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -145,6 +227,20 @@
   .install-section .section-sub { color:rgba(255,255,255,0.6); }
   .install-cmd { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:18px 28px; font-family:'JetBrains Mono',monospace; font-size:13px; max-width:640px; margin:0 auto 16px; color:rgba(255,255,255,0.85); }
   .install-note { font-size:13px; color:rgba(255,255,255,0.4); }
+
+  /* ---- FAQ ---- */
+  .faq-section { background:#fff; border-top:1px solid #eee; }
+  .faq-list { max-width:720px; margin:0 auto; }
+  .faq-item { border-bottom:1px solid #eee; }
+  .faq-item:last-child { border-bottom:none; }
+  .faq-q { font-size:16px; font-weight:700; color:#333; padding:20px 32px 20px 0; cursor:pointer; position:relative; list-style:none; }
+  .faq-q::-webkit-details-marker { display:none; }
+  .faq-q::after { content:'+'; position:absolute; right:0; top:20px; font-size:20px; color:#FF861D; font-weight:400; transition:transform 0.2s; }
+  details[open] .faq-q::after { content:'\2212'; }
+  .faq-a { font-size:14px; color:#666; line-height:1.7; padding:0 0 20px 0; }
+  .faq-a a { color:#1057C8; text-decoration:none; }
+  .faq-a a:hover { text-decoration:underline; }
+  .faq-a code { background:#f4f4f4; padding:2px 6px; border-radius:4px; font-size:13px; }
 
   /* ---- FOOTER ---- */
   .footer { padding:28px 56px; background:#fff; border-top:1px solid #eee; display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#999; }
@@ -391,6 +487,50 @@
   <div class="section-sub">Python 3.11+ required. Zero external dependencies for core features.</div>
   <div class="install-cmd">sh -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"</div>
   <div class="install-note">Works on Linux and macOS. GPL-3.0 license.</div>
+</div>
+
+<!-- FAQ -->
+<div class="section faq-section" id="faq">
+  <div class="section-title">Frequently asked questions</div>
+  <div class="section-sub"></div>
+  <div class="faq-list">
+    <details class="faq-item" open>
+      <summary class="faq-q">What is csauto?</summary>
+      <div class="faq-a">csauto is an open-source Python tool that automates <strong>code_saturne CFD simulation campaigns</strong>. It covers the full workflow: batch case generation from a Design of Experiments (DOE) CSV file, execution on local machines or HPC clusters via Slurm, and real-time monitoring of residual convergence, probe signals, solver errors, and compute performance through a web dashboard.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How do I run a parametric study with code_saturne?</summary>
+      <div class="faq-a">Define your parameter combinations in a CSV file (one row per case, one column per parameter). Create a template case directory where input files use placeholders like <code>{u_inlet}</code> or <code>{turbulence_model}</code>. Run <code>csauto prepare doe.csv TEMPLATE RUNS</code> to generate all cases, then <code>csauto serve RUNS</code> to launch and monitor them from a single web interface.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Does csauto work with Slurm, Docker, and Singularity?</summary>
+      <div class="faq-a">Yes. csauto supports four execution backends: native code_saturne binary, Docker containers, Singularity/Apptainer images (common on HPC clusters), and automatic detection of the best available runtime. Slurm job submission is built in via <code>sbatch</code>, with job status tracked through <code>squeue</code>.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How does csauto monitor simulation convergence?</summary>
+      <div class="faq-a">The web dashboard plots residuals and probe signals in real time for all running cases. You can identify diverging, stalled, or converged simulations at a glance, mark convergence status, and compare residual histories across cases side by side.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How many simulation cases can csauto handle?</summary>
+      <div class="faq-a">csauto can generate and manage hundreds of cases from a single CSV and template directory. Each row in your DOE file becomes a fully resolved simulation case with its own input files, logs, and results.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">What are the system requirements?</summary>
+      <div class="faq-a">Python 3.11 or higher and at least one code_saturne runtime: a native binary installed on your machine, a Docker image, or a Singularity/Apptainer .sif image. The core CLI has zero external Python dependencies. The web dashboard adds only FastAPI and uvicorn.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Can I compare results between simulation cases?</summary>
+      <div class="faq-a">Yes. csauto provides side-by-side comparison of input files, residual curves, probe data, and performance metrics between any two cases. This helps identify the impact of specific parameter changes across your study.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Comment automatiser des simulations code_saturne ?</summary>
+      <div class="faq-a">Avec csauto, vous definissez vos parametres dans un fichier CSV (plan d'experiences), creez un repertoire template avec des marqueurs de substitution, puis lancez <code>csauto prepare</code> pour generer tous les cas. <code>csauto serve</code> demarre ensuite un tableau de bord web pour lancer, surveiller et comparer les simulations en temps reel.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Is csauto free and open-source?</summary>
+      <div class="faq-a">Yes. csauto is released under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 license</a> and developed by <a href="https://simvia.tech">Simvia SAS</a>. The source code is available on <a href="https://github.com/simvia-tech/csauto">GitHub</a>. code_saturne itself is also open-source under GPL-2.0, developed by EDF R&D.</div>
+    </details>
+  </div>
 </div>
 
 <!-- FOOTER -->
