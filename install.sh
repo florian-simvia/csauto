@@ -2,13 +2,13 @@
 # csauto installer
 #
 # Fresh install (curl):
-#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
 #
 # Fresh install (from a local clone):
 #   ./install.sh
 #
 # Update (re-run the same command — the script detects the existing install):
-#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
 #
 # Options:
 #   --no-venv        Install into the current Python environment instead of a venv
@@ -106,7 +106,19 @@ case "$MODE" in
         fi
         info "Cloning csauto to $REPO_DIR ..."
         mkdir -p "$(dirname "$REPO_DIR")"
-        git clone "$REPO_URL" "$REPO_DIR"
+        if [ -d "$REPO_DIR" ] && [ "$(ls -A "$REPO_DIR" 2>/dev/null)" ]; then
+            # Directory exists and is non-empty but not a git clone
+            # (e.g., leftover telemetry.json from a previous failed install).
+            # Clone in place so existing files are preserved.
+            info "Existing non-repo directory found; initializing csauto in place ..."
+            git -C "$REPO_DIR" init -q
+            git -C "$REPO_DIR" remote add origin "$REPO_URL" 2>/dev/null \
+                || git -C "$REPO_DIR" remote set-url origin "$REPO_URL"
+            git -C "$REPO_DIR" fetch -q --depth=1 origin main
+            git -C "$REPO_DIR" checkout -q -f -B main FETCH_HEAD
+        else
+            git clone "$REPO_URL" "$REPO_DIR"
+        fi
         success "Repository cloned"
         ;;
     update)

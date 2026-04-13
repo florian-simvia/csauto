@@ -31,7 +31,7 @@ csauto requires **Python 3.11+** and has **no external dependencies** for core f
 
 ```bash
 # One-line install (clones to ~/.local/share/csauto, creates venv, adds alias)
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/simvia-tech/csauto/main/install.sh)"
 
 # Reload your shell
 source ~/.bashrc   # or: source ~/.zshrc
