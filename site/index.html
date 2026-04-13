@@ -134,7 +134,7 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #333; background: #fff; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #333; background: #fff; -webkit-font-smoothing: antialiased; overflow-x:hidden; }
 
   /* ---- NAV ---- */
   .nav { display:flex; justify-content:space-between; align-items:center; padding:0 56px; height:60px; background:#fff; border-bottom:2px solid #FF861D; position:sticky; top:0; z-index:40; box-shadow: 0 1px 8px rgba(0,0,0,0.04); }
@@ -248,36 +248,96 @@
   .footer-links a { color:#999; text-decoration:none; font-weight:500; transition: color 0.15s; }
   .footer-links a:hover { color:#1057C8; }
 
+  /* ---- HAMBURGER ---- */
+  .nav-toggle { display:none; background:none; border:none; cursor:pointer; padding:10px 4px; z-index:50; -webkit-tap-highlight-color:transparent; }
+  .nav-toggle span { display:block; width:22px; height:2px; background:#333; margin:5px 0; border-radius:2px; transition: transform 0.3s, opacity 0.3s; }
+  .nav.nav-open .nav-toggle span:nth-child(1) { transform:rotate(45deg) translate(5px, 5px); }
+  .nav.nav-open .nav-toggle span:nth-child(2) { opacity:0; }
+  .nav.nav-open .nav-toggle span:nth-child(3) { transform:rotate(-45deg) translate(5px, -5px); }
+
   /* ---- RESPONSIVE ---- */
   @media (max-width: 768px) {
-    .nav { padding:0 24px; flex-wrap:wrap; height:auto; min-height:60px; padding-top:12px; padding-bottom:12px; }
-    .nav-links { flex-wrap:wrap; gap:14px; justify-content:center; }
+    /* NAV */
+    .nav { padding:0 20px; height:56px; flex-wrap:nowrap; }
+    .nav-logo span { display:none; }
+    .nav-logo svg { height:16px; }
+    .nav-toggle { display:block; }
+    .nav-links {
+      display:none; position:absolute; top:56px; left:0; right:0;
+      background:#fff; flex-direction:column; padding:20px;
+      gap:4px; border-bottom:2px solid #FF861D;
+      box-shadow:0 8px 24px rgba(0,0,0,0.1); z-index:39;
+    }
+    .nav.nav-open .nav-links { display:flex; }
+    .nav-links a { padding:12px 0; font-size:16px; border-bottom:1px solid #f0f0f0; }
+    .nav-links a:last-child { border-bottom:none; }
+    .nav-links .btn-gh { text-align:center; padding:12px 18px; margin-top:8px; border-bottom:none; }
 
-    .hero { padding:48px 24px 40px; }
-    .hero h1 { font-size:28px; }
-    .hero .subtitle { font-size:15px; }
-    .hero-ctas { flex-direction:column; align-items:center; }
+    /* HERO */
+    .hero { padding:48px 20px 40px; }
+    .hero-badge { font-size:10px; letter-spacing:2px; padding:5px 14px; }
+    .hero h1 { font-size:26px; }
+    .hero .subtitle { font-size:14px; margin-bottom:28px; }
+    .hero-ctas { flex-direction:column; align-items:center; gap:10px; }
+    .btn-primary, .btn-secondary { width:100%; max-width:300px; text-align:center; display:block; }
 
-    .screenshot { padding:0 24px 40px; }
+    /* SCREENSHOT */
+    .screenshot { padding:0 16px 36px; }
+    .screenshot-bar .url { font-size:10px; max-width:160px; }
 
-    .section { padding:48px 24px; }
+    /* SECTIONS */
+    .section { padding:48px 20px; }
+    .section-title { font-size:24px; }
+    .section-sub { font-size:14px; margin-bottom:32px; }
 
-    .features-grid { grid-template-columns:1fr; gap:14px; }
-
-    .steps-row { flex-direction:column; align-items:center; }
-    .step-arrow { display:none; }
-    .step { max-width:100%; }
-
-    .cs-stats { gap:24px; flex-wrap:wrap; }
+    /* CODE_SATURNE */
+    .cs-logo-placeholder { padding:14px 20px; }
+    .cs-logo-placeholder svg { height:36px; width:auto; }
+    .cs-desc { font-size:14px; line-height:1.65; }
     .cs-features-row { gap:8px; }
+    .cs-tag { font-size:12px; padding:8px 12px; }
+    .cs-stats { gap:20px; flex-wrap:wrap; justify-content:center; }
+    .cs-stat .num { font-size:24px; }
+    .cs-stat .lbl { font-size:10px; }
+    .cs-links { flex-wrap:wrap; gap:8px; }
+    .cs-links a { font-size:12px; padding:10px 16px; }
 
+    /* FEATURES */
+    .features-grid { grid-template-columns:1fr; gap:14px; }
+    .feature-card { padding:20px; }
+    .feature-card h4 { font-size:14px; }
+
+    /* STEPS */
+    .steps-row { flex-direction:column; align-items:center; gap:14px; }
+    .step-arrow { display:none; }
+    .step { max-width:100%; width:100%; }
+
+    /* ROLE GRID */
     .role-grid { grid-template-columns:1fr; }
 
-    .code-block { padding:20px 18px; font-size:12px; }
-    .install-cmd { font-size:11px; padding:14px 16px; }
+    /* CODE & INSTALL */
+    .code-block { padding:20px 16px; font-size:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .install-cmd { font-size:11px; padding:14px 16px; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; }
 
-    .footer { flex-direction:column; gap:16px; text-align:center; padding:24px; }
-    .footer-links { flex-wrap:wrap; justify-content:center; }
+    /* FAQ */
+    .faq-q { font-size:15px; padding:16px 36px 16px 0; }
+    .faq-a { font-size:13px; }
+
+    /* FOOTER */
+    .footer { flex-direction:column; gap:16px; text-align:center; padding:24px 20px; }
+    .footer-links { flex-wrap:wrap; justify-content:center; gap:18px; }
+    .footer-links a { font-size:13px; }
+  }
+
+  /* ---- SMALL SCREENS ---- */
+  @media (max-width: 400px) {
+    .hero h1 { font-size:22px; }
+    .cs-logo-placeholder svg { height:28px; }
+    .cs-stats { gap:16px; }
+    .cs-stat .num { font-size:20px; }
+    .code-block { font-size:11px; padding:16px 12px; }
+    .install-cmd { font-size:10px; padding:12px; }
+    .section-title { font-size:21px; }
   }
 </style>
 </head>
@@ -286,6 +346,9 @@
 <!-- NAV -->
 <div class="nav">
   <div class="nav-logo">csauto <span>by</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="60 90 490 160" style="height:20px;width:auto;vertical-align:middle;margin-left:2px;"><style>.sv0{fill-rule:evenodd;clip-rule:evenodd;fill:#FE5716}.sv1{fill:#09357A}</style><path class="sv0" d="M143.99,86.16c0.55-4.72-0.15-11.63,3.58-14.87c1.09-5.04,9.02-3.87,7.78-7.08c-0.76-2.01-4.49-1.06-6-0.68c-1.15,0.28-12.01,3.72-16.2,4.18c-1.77-0.49-3.54-0.98-5.31-1.48c-6.82,0.92-10.77,6.35-14.56,10.68c-3.18,3.61-7.49,12.47-4.07,17.76c-0.19,1.15-0.39,2.31-0.58,3.47l7.77,11.34c2.67,1.92,3.02,3.35,5.91,5.25c0.59,0.89,1.18,1.78,1.78,2.66c2.36,1.55,9.3,1.58,10.47,0.56c11.19,1.04,9.98-21.6,13.53-26.34C147.63,89.47,145.75,87.25,143.99,86.16 M95.79,154.13c2.37-0.61,6.4-0.92,8.53-1.98c3.37-1.69,14.97-9.8,11.28-16.42c-1.15-13.91-17.93-2.15-25.08-7.02c-7.25-0.94-15.38-14.64-17.55-20.49c-0.86-2.32-0.5-1.52-1.67-3.36c0.02-0.19-0.74,0.64-0.73,0.45c-2.12,2.46-1.75,4.61-2.08,10.62c-0.95-0.06-1.9-0.12-2.84-0.18c-0.19,2.18-0.4,3.36-1.42,4.47c-0.21,0.37-0.43,0.74-0.64,1.1c-1.79-0.6-0.89,0.25-1.63-1.24c-6.66,0.32-6.17,7.02-9.23,10.83C52.88,143.41,77.63,158.84,95.79,154.13 M177.98,116.16c-10.81,1.64-17.41,5.08-21.48,7.91c-2.84,1.98-3.68,3.31-4.29,4.15c-0.62,0.84-1.04,2.69-0.73,4.64c0.32,1.94,1.1,4,2.79,5.13c13.25-0.98,36.27-1.82,40.75,9.33c0.24,1.54,0.58,2.46,0.62,2.85c4.38-1.09,1.18-0.71,7.64,0.32c1.49,0.23,5.13-0.6,7.56-1.18c1.1-0.27,1.72-1.27,1.72-1.27s-0.21-1.06-0.14-1.63c0,0,2.26,0.16,3.19-0.55c6.14-1,2.92-3.89,5.81-7.12C219.65,117.92,198.3,113.08,177.98,116.16 M154.31,161.45c-3.07,2.35-4.37,1.76-6.17,5.4c-0.18,0,0.28,0.56,0.09,0.56c1.83,3.65,6.04,5.14,9.12,7.71c0.97,0.81,3.57,5.33,4.81,5.66c1.39,1.66,2.3,6.26,3.21,6.26c0.95,1.27-0.07,4.32,0.85,5.5c0.06,5.44-0.69,5.83-1.64,6.87c0,0.38,0.52,1.37,0.52,1.74c0.26,0.26,2.44,1.83,3.39,1.63c2.95,0.09,15.11,9.57,16.07,11.38c8.72,0.67,8.09-2,14.1-4.55c1.62-0.69,2.92-0.03,3.98-1.15c1.11-1.14,1.21-3.4,2.28-4.54C205.06,182.48,175.9,162.19,154.31,161.45 M119.99,166.34c-1.21,1.29-4.55,1.77-5.48,3.24c-1.42,2.23-4.69,7.32-7.25,9.75c-8.26,7.82-25.92,11.76-34.62,4.27c-0.57,0.05-0.24,0.37,0.44,2.5c0.64,4.05,3.91,13.58,2.7,16.01c0.78,2.7,1.61,1.72,3.08,3.2c1.01,1.02,1.43,3.67,2.6,4.38c1.32-0.09,2.65-0.19,3.97-0.28c0.25,0.74,0.49,1.49,0.73,2.23c1.7-0.12,3.4-0.24,5.11-0.36c0.96,0.21,3.86,1.7,4.71,1.95c1.89-0.13,3.79-0.27,5.68-0.41c4.33,1.15,8.12-0.66,11.76-3.11c2.04-1.38,4.28-1.16,6.09-2.71c2.63-2.25,6.2-6.65,7.87-9.69c4.11-7.45,2.72-25.3-1.01-29.71C124.9,166.01,123.18,165.98,119.99,166.34"/><path class="sv1" d="M233.95,177.23l6.88-9.17c5.27,5.5,11,8.25,17.42,8.25c6.07,0,9.4-2.41,9.51-6.42c0-4.7-3.09-6.3-12.03-8.37c-13.64-3.1-19.6-8.02-19.6-18.34c0-11,8.6-18.45,23.15-18.45c6.99,0,15.36,2.18,21.55,7.11l-6.07,9.97c-5.16-3.9-9.4-5.96-15.36-5.96c-6.07,0-8.94,2.52-9.06,6.19c0,4.01,2.98,5.85,12.26,8.02c14.1,3.32,19.26,8.37,19.26,17.88c0,11.46-8.48,18.91-22.81,18.91C248.85,186.85,240.6,183.88,233.95,177.23z"/><path class="sv1" d="M285.87,108.57c0-5.04,3.9-9.05,9.28-9.05c5.39,0,9.28,4.01,9.28,9.05c0,4.93-3.9,9.17-9.28,9.17C289.77,117.74,285.87,113.5,285.87,108.57z M287.71,185.59v-59.6h14.67v59.6H287.71z"/><path class="sv1" d="M312.69,185.59v-59.6h13.64v12.04h0.8c3.9-8.83,9.51-13.3,19.14-13.3c9.06,0,14.9,4.7,17.54,13.41h0.8c4.01-8.94,9.74-13.41,19.03-13.41c12.38,0,19.49,8.02,19.49,22.12v38.74h-14.67v-33.81c0-9.86-3.21-14.56-10.66-14.56c-8.37,0-12.49,6.3-12.49,17.88v30.49h-14.79v-33.81c0-9.86-3.1-14.56-10.54-14.56c-8.37,0-12.61,6.3-12.61,17.88v30.49H312.69z"/><path class="sv1" d="M425.01,185.59l-20.52-59.6h16.39l13.53,46.76h0.8l13.75-46.76h15.82l-20.52,59.6H425.01z"/><path class="sv1" d="M466.84,108.57c0-5.04,3.9-9.05,9.28-9.05s9.28,4.01,9.28,9.05c0,4.93-3.9,9.17-9.28,9.17S466.84,113.5,466.84,108.57z M468.68,185.59v-59.6h14.67v59.6H468.68z"/><path class="sv1" d="M541.34,149.03v36.56h-12.61v-10.89h-0.8c-4.35,8.94-8.94,12.15-18.91,12.15c-10.54,0-19.49-6.19-19.49-18.68c0-11.58,8.48-19.37,28.31-19.37c3.78,0,6.53,0.12,9.17,0.46v-0.8c0-5.62-1.83-12.15-11.81-12.15c-7.22,0-13.18,3.44-17.76,7.91l-6.76-9.28c6.19-5.85,14.56-10.2,25.67-10.2C533.89,124.73,541.34,134.36,541.34,149.03z M527.02,159.8v-1.26c-2.18-0.34-4.47-0.46-7.34-0.46c-11.35,0-15.47,3.67-15.47,9.28c0,5.39,3.44,8.14,9.06,8.14C521.63,175.51,527.02,171.04,527.02,159.8z"/></svg></div>
+  <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
   <div class="nav-links">
     <a href="#code-saturne">code_saturne</a>
     <a href="#features">Features</a>
@@ -545,5 +608,24 @@
   </div>
 </div>
 
+<script>
+(function(){
+  var nav=document.querySelector('.nav');
+  var toggle=document.querySelector('.nav-toggle');
+  var links=document.querySelectorAll('.nav-links a');
+  toggle.addEventListener('click',function(){
+    var open=nav.classList.toggle('nav-open');
+    toggle.setAttribute('aria-expanded',open);
+    toggle.setAttribute('aria-label',open?'Close menu':'Open menu');
+  });
+  for(var i=0;i<links.length;i++){
+    links[i].addEventListener('click',function(){
+      nav.classList.remove('nav-open');
+      toggle.setAttribute('aria-expanded','false');
+      toggle.setAttribute('aria-label','Open menu');
+    });
+  }
+})();
+</script>
 </body>
 </html>
