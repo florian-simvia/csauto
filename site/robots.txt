@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://simvia-tech.github.io/csauto/sitemap.xml
