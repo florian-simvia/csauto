@@ -124,7 +124,7 @@ case "$MODE" in
     update)
         info "Existing installation found at $REPO_DIR"
         info "Pulling latest changes ..."
-        git -C "$REPO_DIR" pull --ff-only
+        git -C "$REPO_DIR" pull --ff-only origin main
         success "Repository updated"
         ;;
     local)
@@ -193,7 +193,11 @@ esac
 if $USE_VENV; then
     ALIAS_LINE="alias csauto='$CSAUTO_BIN'"
 
-    SHELL_NAME="$(basename "${SHELL:-/bin/bash}")"
+    _PARENT_CMD="$(ps -o comm= -p "$PPID" 2>/dev/null || true)"
+    case "$_PARENT_CMD" in
+        zsh|bash) SHELL_NAME="$_PARENT_CMD" ;;
+        *)        SHELL_NAME="$(basename "${SHELL:-/bin/bash}")" ;;
+    esac
     case "$SHELL_NAME" in
         zsh)  RC_FILE="$HOME/.zshrc" ;;
         *)    RC_FILE="$HOME/.bashrc" ;;
