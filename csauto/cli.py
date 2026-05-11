@@ -107,6 +107,14 @@ def parse_arguments(
     prepare_parser.add_argument("doe_csv", type=Path, help="Path to the doe.csv file")
     prepare_parser.add_argument("template_case", type=Path, help="Template case directory")
     prepare_parser.add_argument("output_root", type=Path, help="Root directory where cases will be generated")
+    prepare_parser.add_argument(
+        "--test-compile",
+        dest="test_compile",
+        action="store_true",
+        help="After preparing, run 'code_saturne compile -t -s SRC' on the first case to "
+        "validate the auto-generated QoI user file. Requires the configured runtime "
+        "(docker/singularity/native) to be available.",
+    )
     run_parser = subparsers.add_parser("run", help="Launch code_saturne on all cases.")
     run_parser.add_argument("runs_dir", type=Path, help="Directory containing generated cases")
     run_parser.add_argument("--n", dest="nprocs", type=int, required=True, help="Number of MPI processes")
@@ -382,6 +390,37 @@ def main(argv: Sequence[str] | None = None) -> int:
                         f"(e.g. case {sample[0]}). QoI extraction will fail at runtime. "
                         f"Activate these fields in your template setup before re-running prepare."
                     )
+            if getattr(args, "test_compile", False):
+                if not config.qoi_recipes:
+                    print("--test-compile: no [[qoi]] recipes configured, skipping.")
+                else:
+                    from .qoi.compile_check import check_compiles_first_case
+
+                    selection = resolve_runtime(
+                        runtime=config.runtime,
+                        docker_image=config.docker_image,
+                        saturne_bin=config.saturne_bin,
+                        singularity_image=config.singularity_image,
+                        singularity_bin=config.singularity_bin,
+                    )
+                    print(
+                        f"Test-compiling first case with runtime={selection.runtime}..."
+                        + (f" image={config.docker_image}" if selection.runtime == "docker" else "")
+                    )
+                    result = check_compiles_first_case(args.output_root, selection)
+                    if result.success:
+                        print(f"✓ {result.summary()}")
+                    else:
+                        print(f"✗ {result.summary()}")
+                        print("--- compile log -----------------------------")
+                        print(result.log)
+                        print("---------------------------------------------")
+                        error(
+                            f"Test-compile failed (exit code {result.exit_code}). "
+                            f"Fix the issue in the auto-generated user file or your template, "
+                            f"then re-run prepare. The cases on disk are left untouched."
+                        )
+                        return 1
         elif args.command == "run":
             runtime_selection = resolve_runtime(
                 runtime=args.runtime,

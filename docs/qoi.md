@@ -241,6 +241,62 @@ output.
 - Unexpected exception inside an extractor → logged with class + message,
   whole campaign continues
 
+## `csauto prepare --test-compile`
+
+Opt-in flag on `prepare` that validates the auto-generated user file against
+the configured code_saturne runtime **before** you spend any CPU on the
+campaign. Picks the first generated case and runs:
+
+```
+code_saturne compile -t -s SRC
+```
+
+inside it. `-t` is "test mode" — no object files are kept on disk, only the
+exit code matters. On success:
+
+```
+$ csauto prepare doe.csv TEMPLATE RUNS --test-compile
+Injected QoI user file in 12 case(s)
+Enabled QoI boundary fields in setup.xml for 12 case(s)
+Test-compiling first case with runtime=docker image=simvia/code_saturne:9.1.0...
+✓ test-compile OK (docker) for case0001
+```
+
+On failure the full `mpic++` output is dumped to stderr and prepare exits 1 —
+the cases stay on disk so you can inspect what was generated:
+
+```
+$ csauto prepare doe.csv TEMPLATE RUNS --test-compile
+...
+✗ test-compile FAILED (docker) for case0001
+--- compile log -----------------------------
+.../cs_user_extra_operations.cpp:42:6: error: 'cs_field_by_name_typo' was not declared
+---------------------------------------------
+Error: Test-compile failed (exit code 1). Fix the issue in the auto-generated
+user file or your template, then re-run prepare. The cases on disk are left untouched.
+```
+
+### Runtime support
+
+| Runtime | Status |
+|---|---|
+| `docker` | ✅ pulls the configured `docker_image`, mounts the parent runs dir |
+| `singularity` / `apptainer` | ✅ binds the parent runs dir into the image |
+| `native` | ✅ invokes the resolved `code_saturne` binary directly |
+
+The chosen runtime mirrors what `csauto run` will use. Default timeout is
+300 s (configurable in code, not yet exposed as a CLI flag).
+
+### When to use it
+
+- After modifying your template's `cs_user_*.cpp` files
+- After upgrading code_saturne (catches API breakages)
+- After editing the `[[qoi]]` section (typo on a boundary name etc.)
+- In CI before a release tag
+
+Skipping `--test-compile` is fine for routine reruns — the auto-generated
+file is deterministic and only changes when the recipe set changes.
+
 ## Roadmap
 
 | Phase | What lands |
@@ -249,7 +305,7 @@ output.
 | 1 — first recipe ✅ | `force_coefficient` extractor + v9 C++ template + render() |
 | 2 — `prepare` injection ✅ | per-boundary helpers assembled into `caseXXXX/SRC/cs_user_extra_operations.cpp`, mode `managed` |
 | 3 — `csauto postprocess` CLI ✅ | walks RUNS, runs every extractor, writes CSV/TSV/JSON table |
-| 4 — test-compile at prepare | catch broken templates early on a single case using a v9 image |
+| 4 — test-compile at prepare ✅ | `--test-compile` flag invokes `code_saturne compile -t` on the first case via the configured runtime |
 | 5 — more recipes | `pressure_drop`, `heat_flux`, `field_stat`, `y_plus_stats` |
 | 6 — coexistence mode | inject into a separate user-file when the template already ships its own |
 | 7 — UI integration | dashboard panel with auto-discovery + interactive table + plots |
@@ -261,4 +317,4 @@ output.
 - Built-in extractors: ✅ `force_coefficient` (1/N)
 - C++ template injection at prepare: ✅ managed mode
 - Postprocess CLI: ✅ CSV / TSV / JSON
-- Test-compile at prepare: ❌ not yet (phase 4)
+- Test-compile at prepare: ✅ `--test-compile` flag
