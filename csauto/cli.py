@@ -339,6 +339,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "prepare":
             headers, rows = load_doe(args.doe_csv)
             generate_cases(headers, rows, args.template_case, args.output_root)
+            if config.qoi_recipes:
+                from .qoi.injection import inject_user_files_into_runs
+
+                written = inject_user_files_into_runs(args.output_root, config.qoi_recipes)
+                if written:
+                    print(f"Injected QoI user file in {len(written)} case(s)")
         elif args.command == "run":
             runtime_selection = resolve_runtime(
                 runtime=args.runtime,

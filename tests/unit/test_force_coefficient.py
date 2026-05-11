@@ -9,8 +9,9 @@ from csauto.qoi import Context, Recipe
 from csauto.qoi.errors import QoIError, RecipeError
 from csauto.qoi.types.force_coefficient import (
     ForceCoefficientExtractor,
+    helper_name,
     output_csv_path,
-    render_template,
+    render_helper,
 )
 
 # --- Test helpers -----------------------------------------------------------
@@ -211,26 +212,53 @@ def test_output_csv_path_format() -> None:
     assert output_csv_path("wing") == "monitoring/csauto_forces_wing.csv"
 
 
-def test_render_template_contains_boundary_and_output_path() -> None:
-    rendered = render_template("wing")
+def test_helper_name_basic() -> None:
+    assert helper_name("wing") == "csauto_qoi_force_wing"
+
+
+@pytest.mark.parametrize(
+    ("boundary", "expected"),
+    [
+        ("wing-tip", "csauto_qoi_force_wing_tip"),
+        ("wing.upper", "csauto_qoi_force_wing_upper"),
+        ("wing/lower", "csauto_qoi_force_wing_lower"),
+        ("1stbody", "csauto_qoi_force__1stbody"),
+    ],
+)
+def test_helper_name_sanitizes_non_identifier_characters(boundary: str, expected: str) -> None:
+    assert helper_name(boundary) == expected
+
+
+def test_render_helper_emits_static_function_with_boundary_and_output_path() -> None:
+    rendered = render_helper("wing")
+    assert rendered.lstrip().startswith("static void")
+    assert "csauto_qoi_force_wing(cs_domain_t *domain)" in rendered
     assert 'cs_boundary_zone_by_name_try("wing")' in rendered
     assert "monitoring/csauto_forces_wing.csv" in rendered
 
 
-def test_render_template_has_no_unresolved_placeholders() -> None:
-    rendered = render_template("wing")
+def test_render_helper_has_no_unresolved_placeholders() -> None:
+    rendered = render_helper("wing")
     # string.Template uses $name / ${name} as placeholders. Any remaining
     # $-form would mean a missing substitution variable.
     leftovers = Template.pattern.findall(rendered)
-    # Each match is a tuple; the placeholder name is the captured group.
     unresolved = [groups for groups in leftovers if any(group for group in groups[1:] if group)]
     assert unresolved == [], f"Unresolved placeholders: {unresolved}"
 
 
-def test_render_template_for_different_boundaries_is_isolated() -> None:
-    wing = render_template("wing")
-    fuselage = render_template("fuselage")
+def test_render_helper_for_different_boundaries_is_isolated() -> None:
+    wing = render_helper("wing")
+    fuselage = render_helper("fuselage")
     assert "wing" in wing
     assert "fuselage" in fuselage
     assert "fuselage" not in wing
     assert "wing" not in fuselage
+
+
+def test_cpp_helpers_returns_one_helper_per_boundary() -> None:
+    recipe = _make_recipe()  # boundary = "wing"
+    helpers = ForceCoefficientExtractor().cpp_helpers(recipe)
+    assert len(helpers) == 1
+    assert helpers[0].name == "csauto_qoi_force_wing"
+    assert "csauto_qoi_force_wing" in helpers[0].code
+    assert "monitoring/csauto_forces_wing.csv" in helpers[0].code
