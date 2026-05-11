@@ -74,6 +74,46 @@ Future extensions (already anticipated):
 
 ## Recipe types
 
+### `pressure_drop`
+
+Compute the head loss between two boundary patches (inlet and outlet). The C++
+helper integrates four quantities over each boundary at every time step:
+total pressure, kinetic energy density (½ ρ V²), gravitational head (ρ g z) and
+the patch area. The Python extractor reads both per-boundary CSVs and computes
+the difference of the chosen head form.
+
+```toml
+[[qoi]]
+name = "dP"
+type = "pressure_drop"
+inlet = "INLET"                  # required, boundary zone label in setup.xml
+outlet = "OUTLET"                # required, boundary zone label
+mode = "bernoulli"               # optional: "bernoulli" (default) | "static"
+aggregate = "mean_last_10pct"    # optional, default "mean_last_10pct"
+```
+
+**Modes**
+
+| Mode | Formula | Use when |
+|---|---|---|
+| `"bernoulli"` (default) | `(p + ½ρV² + ρgz)_in − (p + ½ρV² + ρgz)_out` | You want the **real head loss** (friction + minor losses, what dimensions a pump). Subtracts elevation and kinetic effects, so what remains is dissipation. |
+| `"static"` | `total_pressure_in − total_pressure_out` | You want the raw static pressure difference (a wall sensor reading). **Mixes friction with elevation head** if the two patches are not at the same height. |
+
+**code_saturne v9 nomenclature gotcha** — the helper reads `total_pressure`
+(the field code_saturne exposes), which is the **physical static pressure**
+(with hydrostatic offset and RANS-EVM TKE correction reconstructed). Despite
+the name, `total_pressure` does NOT include the kinetic term — that's why the
+bernoulli mode adds `0.5 ρ V²` explicitly.
+
+**Required setup activation** — csauto auto-enables `<property name="total_pressure">`
+in every `caseXXXX/DATA/setup.xml` at prepare time (same mechanism as `stress`
+for `force_coefficient`).
+
+**Shared boundary helpers** — if two recipes reference the same boundary (e.g.
+chained sections where the outlet of one is the inlet of the next), the cpp
+assembler deduplicates the helpers automatically. One helper per unique
+boundary, one CSV per boundary.
+
 ### `force_coefficient`
 
 Compute an aerodynamic-style coefficient (Cd, Cl, Cm, ...) by integrating
@@ -306,7 +346,7 @@ file is deterministic and only changes when the recipe set changes.
 | 2 — `prepare` injection ✅ | per-boundary helpers assembled into `caseXXXX/SRC/cs_user_extra_operations.cpp`, mode `managed` |
 | 3 — `csauto postprocess` CLI ✅ | walks RUNS, runs every extractor, writes CSV/TSV/JSON table |
 | 4 — test-compile at prepare ✅ | `--test-compile` flag invokes `code_saturne compile -t` on the first case via the configured runtime |
-| 5 — more recipes | `pressure_drop`, `heat_flux`, `field_stat`, `y_plus_stats` |
+| 5 — more recipes (in progress) | `pressure_drop` ✅, `heat_flux`, `field_stat`, `y_plus_stats` |
 | 6 — coexistence mode | inject into a separate user-file when the template already ships its own |
 | 7 — UI integration | dashboard panel with auto-discovery + interactive table + plots |
 
@@ -314,7 +354,7 @@ file is deterministic and only changes when the recipe set changes.
 
 - `[[qoi]]` parsing: ✅ implemented
 - `csauto doctor` version gate: ✅ implemented
-- Built-in extractors: ✅ `force_coefficient` (1/N)
+- Built-in extractors: ✅ `force_coefficient`, `pressure_drop` (2/N)
 - C++ template injection at prepare: ✅ managed mode
 - Postprocess CLI: ✅ CSV / TSV / JSON
 - Test-compile at prepare: ✅ `--test-compile` flag
