@@ -10,6 +10,8 @@ compatible with older versions; only the QoI feature is gated.
 
 from __future__ import annotations
 
+# Side-effect: importing types triggers @register for every built-in extractor.
+from . import types  # noqa: F401
 from .errors import QoIError, RecipeError, SaturneVersionError, UnknownRecipeTypeError
 from .extractor import Context, Extractor
 from .recipe import Recipe, parse_recipe

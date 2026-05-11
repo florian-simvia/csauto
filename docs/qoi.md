@@ -72,22 +72,65 @@ Future extensions (already anticipated):
 - `cpp_template() -> Path` — for recipes that require csauto to inject a user file at `prepare` time.
 - `cache_key(recipe) -> str` — for incremental recomputation.
 
+## Recipe types
+
+### `force_coefficient`
+
+Compute an aerodynamic-style coefficient (Cd, Cl, Cm, ...) by integrating
+pressure and viscous forces over a boundary patch.
+
+```toml
+[[qoi]]
+name = "Cd"                       # column name in the result table
+type = "force_coefficient"
+boundary = "wing"                 # required, str — name of the boundary zone
+direction = [1.0, 0.0, 0.0]       # required, list[float] length 3 — projection axis
+ref_area = 1.5                    # required, float > 0
+ref_velocity = 30.0               # required, float > 0
+ref_density = 1.225               # required, float > 0
+aggregate = "mean_last_10pct"     # optional, default "mean_last_10pct"
+```
+
+**Aggregate modes**
+- `"final"` — take the last sample only
+- `"mean_last_Npct"` — mean over the last N% of samples (e.g. `mean_last_10pct`, `mean_last_50pct`)
+
+**Pipeline**
+1. `prepare` writes `caseXXXX/SRC/cs_user_extra_operations.cpp` from a template
+   that targets the **code_saturne v9** user-file API. The user file integrates
+   pressure × normal and the wall stress vector (`boundary_stress` field) at
+   every time step and appends a row to:
+   ```
+   caseXXXX/monitoring/csauto_forces_<boundary>.csv
+   ```
+   with columns `t, Fpx, Fpy, Fpz, Fvx, Fvy, Fvz`.
+2. `postprocess` reads that CSV, aggregates over the requested time window,
+   projects onto `direction` and normalizes by `0.5 * ref_density * ref_velocity^2 * ref_area`.
+
+**Status caveat** — the C++ template is a **first draft**. It uses well-known
+v9 symbols (`cs_boundary_zone_by_name_try`, `cs_field_by_name`, `cs_parall_sum`,
+`cs_glob_time_step`, etc.) but has not yet been compiled and run against a real
+code_saturne v9 install. The validation step lands with the next phase (prepare
+injection + test-compile). Until then, treat the template as schema-correct but
+runtime-unverified.
+
 ## Roadmap
 
 | Phase | What lands |
 |---|---|
-| 0 — skeleton (current) | package layout, recipe parsing, doctor v9 gate, registry |
-| 1 — first recipe | `force_coefficient` end-to-end: C++ template (v9 API), `prepare` injection, extractor, parquet export |
-| 2 — `csauto postprocess` CLI | `csauto postprocess RUNS --out results.parquet` |
-| 3 — test-compile at prepare | catch broken templates early on a single case |
-| 4 — more recipes | `pressure_drop`, `heat_flux`, `field_stat`, `y_plus_stats` |
-| 5 — coexistence mode | inject into a separate user-file when the template already ships its own |
-| 6 — UI integration | dashboard panel with auto-discovery + interactive table + plots |
+| 0 — skeleton ✅ | package layout, recipe parsing, doctor v9 gate, registry |
+| 1 — first recipe ✅ | `force_coefficient` extractor + v9 C++ template + render() |
+| 2 — `prepare` injection | write the rendered `.cpp` into `caseXXXX/SRC/` at prepare time, mode `managed` |
+| 3 — `csauto postprocess` CLI | walks RUNS, calls every extractor, exports CSV / parquet |
+| 4 — test-compile at prepare | catch broken templates early on a single case |
+| 5 — more recipes | `pressure_drop`, `heat_flux`, `field_stat`, `y_plus_stats` |
+| 6 — coexistence mode | inject into a separate user-file when the template already ships its own |
+| 7 — UI integration | dashboard panel with auto-discovery + interactive table + plots |
 
 ## Status of the gate
 
 - `[[qoi]]` parsing: ✅ implemented
 - `csauto doctor` version gate: ✅ implemented
-- Built-in extractors: ❌ none yet
-- C++ template injection: ❌ not yet
-- Postprocess CLI: ❌ not yet
+- Built-in extractors: ✅ `force_coefficient` (1/N)
+- C++ template injection at prepare: ❌ not yet (phase 2)
+- Postprocess CLI: ❌ not yet (phase 3)
