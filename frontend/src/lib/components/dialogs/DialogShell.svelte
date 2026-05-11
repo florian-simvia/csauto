@@ -47,8 +47,17 @@
     else if (e.key === "Enter" && onConfirm) onConfirm();
   }
 
+  let mouseDownOnBackdrop = false;
+
+  function onBackdropMouseDown(e: MouseEvent) {
+    mouseDownOnBackdrop =
+      (e.target as HTMLElement).dataset.backdrop !== undefined;
+  }
+
   function onBackdropClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).dataset.backdrop !== undefined) cancel();
+    const onBackdrop = (e.target as HTMLElement).dataset.backdrop !== undefined;
+    if (mouseDownOnBackdrop && onBackdrop) cancel();
+    mouseDownOnBackdrop = false;
   }
 </script>
 
@@ -58,6 +67,7 @@
     class="fixed inset-0 bg-[rgba(0,26,112,0.3)] backdrop-blur-sm flex items-center justify-center p-4 z-50"
     data-backdrop
     onkeydown={onKeydown}
+    onmousedown={onBackdropMouseDown}
     onclick={onBackdropClick}
   >
     <div
