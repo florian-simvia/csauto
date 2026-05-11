@@ -341,10 +341,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             generate_cases(headers, rows, args.template_case, args.output_root)
             if config.qoi_recipes:
                 from .qoi.injection import inject_user_files_into_runs
+                from .qoi.setup_patcher import patch_setup_for_recipes
+                from .warn import warn
 
                 written = inject_user_files_into_runs(args.output_root, config.qoi_recipes)
                 if written:
                     print(f"Injected QoI user file in {len(written)} case(s)")
+                reports = patch_setup_for_recipes(args.output_root, config.qoi_recipes)
+                n_changed = sum(1 for r in reports if r.changed)
+                if n_changed:
+                    print(f"Enabled QoI boundary fields in setup.xml for {n_changed} case(s)")
+                missing_by_case = {r.case_dir.name: r.missing for r in reports if r.missing}
+                if missing_by_case:
+                    sample = next(iter(missing_by_case.items()))
+                    warn(
+                        f"setup.xml is missing <property> tags for: {', '.join(sample[1])} "
+                        f"(e.g. case {sample[0]}). QoI extraction will fail at runtime. "
+                        f"Activate these fields in your template setup before re-running prepare."
+                    )
         elif args.command == "run":
             runtime_selection = resolve_runtime(
                 runtime=args.runtime,

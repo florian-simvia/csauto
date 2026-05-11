@@ -49,59 +49,80 @@ from ..registry import register
 
 _DEFAULT_AGGREGATE = "mean_last_10pct"
 _AGGREGATE_PCT_RE = re.compile(r"^mean_last_(\d+)pct$")
-_FORCE_COLUMNS = ("Fpx", "Fpy", "Fpz", "Fvx", "Fvy", "Fvz")
+# Total force, normal component, tangential component — 9 components per row.
+_FORCE_COMPONENT_COLUMNS = ("Fx", "Fy", "Fz", "Fnx", "Fny", "Fnz", "Ftx", "Fty", "Ftz")
+_TOTAL_FORCE_COLUMNS = ("Fx", "Fy", "Fz")
 _NON_IDENT_RE = re.compile(r"[^A-Za-z0-9_]")
 
 _HELPER_TEMPLATE = Template(
     r"""static void
 ${helper_name}(cs_domain_t *domain)
 {
-  const cs_mesh_t            *m  = domain->mesh;
   const cs_mesh_quantities_t *mq = domain->mesh_quantities;
 
   const cs_zone_t *z = cs_boundary_zone_by_name_try("${boundary}");
   if (z == nullptr)
     return;
 
-  const cs_real_t   *p_val     = cs_field_by_name("pressure")->val;
-  const cs_field_t  *f_bstress = cs_field_by_name_try("boundary_stress");
+  /* These three boundary fields must be activated in the setup. csauto's
+     prepare step toggles their postprocessing_recording on automatically;
+     the runtime check below is a safety net if the user later disables
+     them by hand. */
+  const cs_field_t *f_stress  = cs_field_by_name_try("stress");
+  const cs_field_t *f_normal  = cs_field_by_name_try("stress_normal");
+  const cs_field_t *f_tangent = cs_field_by_name_try("stress_tangential");
+  if (f_stress == nullptr || f_normal == nullptr || f_tangent == nullptr) {
+    static bool warned = false;
+    if (cs_glob_rank_id <= 0 && !warned) {
+      warned = true;
+      std::fprintf(stderr,
+                   "[csauto] force_coefficient helper for boundary "
+                   "\"${boundary}\" requires fields 'stress', "
+                   "'stress_normal' and 'stress_tangential' to be enabled "
+                   "on the boundary. Skipping.\n");
+    }
+    return;
+  }
 
-  cs_real_t F_pres[3] = {0.0, 0.0, 0.0};
-  cs_real_t F_visc[3] = {0.0, 0.0, 0.0};
+  /* Assumption: Stress / stress_normal / stress_tangential are wall tractions
+     in Pa (N/m^2). We integrate over the patch by multiplying by face area. */
+  cs_real_t F[3]  = {0.0, 0.0, 0.0};
+  cs_real_t Fn[3] = {0.0, 0.0, 0.0};
+  cs_real_t Ft[3] = {0.0, 0.0, 0.0};
 
   for (cs_lnum_t i = 0; i < z->n_elts; i++) {
     const cs_lnum_t  face_id = z->elt_ids[i];
-    const cs_lnum_t  cell_id = m->b_face_cells[face_id];
-    const cs_real_t *n_a     = mq->b_face_normal + 3 * face_id;  /* direction * area */
-    const cs_real_t  p_face  = p_val[cell_id];
+    const cs_real_t  area    = mq->b_face_surf[face_id];
+    const cs_real_t *s_tot   = f_stress->val  + 3 * face_id;
+    const cs_real_t *s_nrm   = f_normal->val  + 3 * face_id;
+    const cs_real_t *s_tan   = f_tangent->val + 3 * face_id;
 
-    for (int j = 0; j < 3; j++)
-      F_pres[j] += p_face * n_a[j];
-
-    if (f_bstress != nullptr) {
-      const cs_real_t  area = mq->b_face_surf[face_id];
-      const cs_real_t *tau  = f_bstress->val + 3 * face_id;
-      for (int j = 0; j < 3; j++)
-        F_visc[j] += tau[j] * area;
+    for (int j = 0; j < 3; j++) {
+      F[j]  += s_tot[j] * area;
+      Fn[j] += s_nrm[j] * area;
+      Ft[j] += s_tan[j] * area;
     }
   }
 
-  cs_parall_sum(3, CS_REAL_TYPE, F_pres);
-  cs_parall_sum(3, CS_REAL_TYPE, F_visc);
+  cs_parall_sum(3, CS_REAL_TYPE, F);
+  cs_parall_sum(3, CS_REAL_TYPE, Fn);
+  cs_parall_sum(3, CS_REAL_TYPE, Ft);
 
   if (cs_glob_rank_id <= 0) {
     static FILE *fp = nullptr;
     if (fp == nullptr) {
       fp = std::fopen("${output_csv}", "w");
       if (fp != nullptr)
-        std::fprintf(fp, "t,Fpx,Fpy,Fpz,Fvx,Fvy,Fvz\n");
+        std::fprintf(fp,
+                     "t,Fx,Fy,Fz,Fnx,Fny,Fnz,Ftx,Fty,Ftz\n");
     }
     if (fp != nullptr) {
       std::fprintf(fp,
-                   "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
+                   "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
                    cs_glob_time_step->t_cur,
-                   F_pres[0], F_pres[1], F_pres[2],
-                   F_visc[0], F_visc[1], F_visc[2]);
+                   F[0],  F[1],  F[2],
+                   Fn[0], Fn[1], Fn[2],
+                   Ft[0], Ft[1], Ft[2]);
       std::fflush(fp);
     }
   }
@@ -159,7 +180,7 @@ class ForceCoefficientExtractor:
         aggregated = _aggregate_rows(rows, mode)
 
         direction = tuple(float(c) for c in recipe.params["direction"])
-        f_total = tuple(aggregated[f"Fp{axis}"] + aggregated[f"Fv{axis}"] for axis in ("x", "y", "z"))
+        f_total = tuple(aggregated[f"F{axis}"] for axis in ("x", "y", "z"))
         f_dir = sum(f_total[i] * direction[i] for i in range(3))
 
         ref_density = float(recipe.params["ref_density"])
@@ -173,6 +194,10 @@ class ForceCoefficientExtractor:
     def cpp_helpers(self, recipe: Recipe) -> list[CppHelper]:
         boundary = str(recipe.params["boundary"])
         return [CppHelper(name=helper_name(boundary), code=render_helper(boundary))]
+
+    def required_setup_properties(self, recipe: Recipe) -> list[str]:
+        """Boundary fields csauto activates in setup.xml at prepare time."""
+        return ["stress", "stress_normal", "stress_tangential"]
 
 
 # --- Validation helpers -----------------------------------------------------
@@ -226,12 +251,15 @@ def _read_force_csv(path: Path) -> list[dict[str, float]]:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise QoIError(f"force_coefficient: CSV has no header: {path}")
-        missing = [col for col in _FORCE_COLUMNS if col not in reader.fieldnames]
+        # The extractor only needs the total-force columns; the normal/tangential
+        # columns travel for diagnostic use but are not required at this stage.
+        missing = [col for col in _TOTAL_FORCE_COLUMNS if col not in reader.fieldnames]
         if missing:
             raise QoIError(f"force_coefficient: CSV {path} missing columns: {', '.join(missing)}")
+        present = [col for col in _FORCE_COMPONENT_COLUMNS if col in reader.fieldnames]
         for raw in reader:
             try:
-                rows.append({col: float(raw[col]) for col in _FORCE_COLUMNS})
+                rows.append({col: float(raw[col]) for col in present})
             except (TypeError, ValueError) as exc:
                 raise QoIError(f"force_coefficient: malformed row in {path}: {raw}") from exc
     if not rows:
@@ -240,6 +268,7 @@ def _read_force_csv(path: Path) -> list[dict[str, float]]:
 
 
 def _aggregate_rows(rows: list[dict[str, float]], mode: str) -> dict[str, float]:
+    columns = tuple(rows[0].keys())
     if mode == "final":
         return dict(rows[-1])
     match = _AGGREGATE_PCT_RE.match(mode)
@@ -249,7 +278,7 @@ def _aggregate_rows(rows: list[dict[str, float]], mode: str) -> dict[str, float]
     pct = int(match.group(1))
     window = max(1, len(rows) * pct // 100)
     tail = rows[-window:]
-    return {col: sum(r[col] for r in tail) / len(tail) for col in _FORCE_COLUMNS}
+    return {col: sum(r[col] for r in tail) / len(tail) for col in columns}
 
 
 __all__ = [

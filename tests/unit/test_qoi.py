@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 
 from csauto.qoi import (
@@ -64,12 +66,15 @@ def test_parse_recipe_rejects_non_dict() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Each test gets a fresh registry — avoids cross-test pollution."""
-    monkeypatch.setattr("csauto.qoi.registry._REGISTRY", {})
-    # _REGISTRY is also referenced by from-import in tests; keep the original
-    # object's contents empty within the test scope via the module-level binding.
+def _isolate_registry() -> Iterator[None]:
+    """Each test gets a fresh registry, with the original content restored after."""
+    saved = dict(_REGISTRY)
     _REGISTRY.clear()
+    try:
+        yield
+    finally:
+        _REGISTRY.clear()
+        _REGISTRY.update(saved)
 
 
 class _FakeExtractor:

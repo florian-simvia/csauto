@@ -98,21 +98,54 @@ aggregate = "mean_last_10pct"     # optional, default "mean_last_10pct"
 **Pipeline**
 1. `prepare` writes `caseXXXX/SRC/cs_user_extra_operations.cpp` from a template
    that targets the **code_saturne v9** user-file API. The user file integrates
-   pressure × normal and the wall stress vector (`boundary_stress` field) at
-   every time step and appends a row to:
+   three boundary fields — `Stress` (total wall traction), `stress_normal` and
+   `stress_tangential` — over the named boundary at every time step, and appends
+   one row to:
    ```
    caseXXXX/monitoring/csauto_forces_<boundary>.csv
    ```
-   with columns `t, Fpx, Fpy, Fpz, Fvx, Fvy, Fvz`.
+   with columns:
+   ```
+   t, Fx, Fy, Fz, Fnx, Fny, Fnz, Ftx, Fty, Ftz
+   ```
+   `Fx, Fy, Fz` are the components of the total integrated force. The `Fn*` and
+   `Ft*` columns carry the normal and tangential decomposition for diagnostic
+   use (form drag vs skin friction); the extractor reads them but only uses the
+   total to compute the coefficient.
 2. `postprocess` reads that CSV, aggregates over the requested time window,
    projects onto `direction` and normalizes by `0.5 * ref_density * ref_velocity^2 * ref_area`.
 
-**Status caveat** — the C++ template is a **first draft**. It uses well-known
-v9 symbols (`cs_boundary_zone_by_name_try`, `cs_field_by_name`, `cs_parall_sum`,
-`cs_glob_time_step`, etc.) but has not yet been compiled and run against a real
-code_saturne v9 install. Validation against a v9 Docker/Singularity image is
-part of the next phase (test-compile at prepare). Until then, treat the template
-as schema-correct but runtime-unverified.
+**Required setup activation (v9)** — `force_coefficient` needs three boundary
+fields recorded by code_saturne: `stress`, `stress_normal`, `stress_tangential`.
+**csauto activates them automatically** at `prepare` time by toggling
+`<postprocessing_recording status="off"/>` to `"on"` inside the matching
+`<property>` blocks of every `caseXXXX/DATA/setup.xml`. There is no manual
+click in the code_saturne GUI to do.
+
+If a property tag is missing from your template setup.xml entirely, csauto
+prints a warning during `prepare` pointing to the impacted case — that case
+will not produce a force CSV at runtime. Add the missing `<property>` to your
+template setup and re-run prepare.
+
+If the user later disables one of these fields by hand (e.g. by re-saving the
+setup with the GUI), the C++ helper detects the missing field at runtime,
+prints a single stderr warning identifying the boundary, and skips silently.
+The CSV will not be created and `postprocess` will fail with a clear "CSV not
+found" error.
+
+**Units assumption** — the helper assumes the three stress fields are wall
+tractions expressed in Pa (N/m²) and multiplies by `b_face_surf` to obtain
+Newtons. If a v9 release exposes these fields as already-integrated forces
+(N per face), one inner-loop line of the template needs to drop the `area`
+factor; let us know if your runtime coefficients come out off by an area
+factor.
+
+**Status caveat** — the C++ template is a **first draft**. It uses
+plausible v9 symbols (`cs_boundary_zone_by_name_try`, `cs_field_by_name_try`,
+`cs_parall_sum`, `cs_glob_time_step`, ...) but has not yet been compiled and
+run against a real code_saturne v9 install. Validation against a v9
+Docker/Singularity image is part of the next phase (test-compile at prepare).
+Until then, treat the template as schema-correct but runtime-unverified.
 
 ## How injection works
 
