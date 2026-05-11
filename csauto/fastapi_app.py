@@ -13,6 +13,7 @@ from .fastapi_routes import (
     register_case_data_routes,
     register_compare_routes,
     register_observability_routes,
+    register_qoi_routes,
     register_settings_routes,
 )
 from .fastapi_routes.common import FastAPIContext, build_shared_models
@@ -124,6 +125,7 @@ def create_fastapi_app(
     register_case_data_routes(app, ctx, components)
     register_compare_routes(app, ctx, components)
     register_action_routes(app, ctx, components)
+    register_qoi_routes(app, ctx, components)
     register_settings_routes(app, ctx, components)
 
     from starlette.staticfiles import StaticFiles

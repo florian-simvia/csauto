@@ -14,6 +14,7 @@ import type {
   RestartOriginResponse,
   ProbePositionResponse,
   CleanupResponse,
+  QoIResultsPayload,
 } from "./types";
 
 /* Helpers */
@@ -257,4 +258,10 @@ export function setTelemetrySettings(
   enabled: boolean,
 ): Promise<{ enabled: boolean }> {
   return apiPost<{ enabled: boolean }>("/api/settings/telemetry", { enabled });
+}
+
+/* QoI auto-postprocessing */
+
+export function fetchQoIResults(): Promise<QoIResultsPayload> {
+  return apiGet<QoIResultsPayload>("/api/qoi/results");
 }

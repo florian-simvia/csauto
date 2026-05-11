@@ -18,6 +18,7 @@
   import LogTailCard from "$lib/components/tail/LogTailCard.svelte";
   import CompareCard from "$lib/components/compare/CompareCard.svelte";
   import RecentErrorsCard from "$lib/components/errors/RecentErrorsCard.svelte";
+  import QoiCard from "$lib/components/qoi/QoiCard.svelte";
 
   import { fetchStatus } from "$lib/api/endpoints";
   import {
@@ -71,6 +72,7 @@
 
 <main class="grid grid-cols-12 gap-4 w-[min(1200px,94vw)] mx-auto pt-5 pb-12">
   <StatusCard onRefresh={loadStatus} />
+  <QoiCard />
   <ResidualPlotCard allCases={allCaseIds} />
   <ProbesCard allCases={allCaseIds} />
   <PerformanceCard allCases={allCaseIds} />

@@ -119,3 +119,28 @@ export interface CleanChoice {
   keepResu?: string[];
   deleteResu?: string[];
 }
+
+/* QoI campaign table — /api/qoi/results */
+
+export interface QoIRecipeSummary {
+  name: string;
+  type: string;
+}
+
+export interface QoIResultRow {
+  case_id: string;
+  doe: Record<string, string>;
+  qois: Record<string, number | null>;
+  status: "ok" | "error";
+  errors: string[];
+}
+
+export interface QoIResultsPayload {
+  recipes: QoIRecipeSummary[];
+  doe_columns: string[];
+  qoi_columns: string[];
+  rows: QoIResultRow[];
+  n_total: number;
+  n_errors: number;
+  mode: "managed" | "injected";
+}

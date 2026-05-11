@@ -370,6 +370,21 @@ The chosen runtime mirrors what `csauto run` will use. Default timeout is
 Skipping `--test-compile` is fine for routine reruns — the auto-generated
 file is deterministic and only changes when the recipe set changes.
 
+## Dashboard panel
+
+The web UI exposes a "Quantities of Interest" card right under the Status table:
+
+- Pulls `GET /api/qoi/results` on load and on every auto-refresh tick (10 s default).
+- Renders one row per case: `case_id`, every DOE column, every QoI column, status.
+- Sortable columns (click the header), status filter (all / ok / errors only).
+- Failed rows are highlighted; hovering the "error" badge shows the recipe-level message.
+- "Download CSV" button exports the current sorted view client-side.
+- Empty state explains how to add a `[[qoi]]` recipe when none are configured.
+
+The backend endpoint re-reads `csauto.toml` on every request, so live edits to
+the recipe list (or `qoi_mode`) take effect without restarting the server —
+just hit Refresh in the card.
+
 ## Roadmap
 
 | Phase | What lands |
@@ -381,7 +396,7 @@ file is deterministic and only changes when the recipe set changes.
 | 4 — test-compile at prepare ✅ | `--test-compile` flag invokes `code_saturne compile -t` on the first case via the configured runtime |
 | 5 — more recipes (in progress) | `pressure_drop` ✅, `heat_flux`, `field_stat`, `y_plus_stats` |
 | 6 — coexistence mode ✅ | `qoi_mode = "injected"` writes a sidecar pair; user owns cs_user_extra_operations and calls csauto_qoi_dispatch |
-| 7 — UI integration | dashboard panel with auto-discovery + interactive table + plots |
+| 7 — UI integration ✅ | dashboard "Quantities of Interest" panel with sortable table + status filter + CSV export |
 
 ## Status of the gate
 
@@ -391,3 +406,4 @@ file is deterministic and only changes when the recipe set changes.
 - C++ template injection at prepare: ✅ managed mode
 - Postprocess CLI: ✅ CSV / TSV / JSON
 - Test-compile at prepare: ✅ `--test-compile` flag
+- Dashboard panel: ✅ `/api/qoi/results` + Quantities of Interest card
