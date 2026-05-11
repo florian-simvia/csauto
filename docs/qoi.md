@@ -83,7 +83,7 @@ pressure and viscous forces over a boundary patch.
 [[qoi]]
 name = "Cd"                       # column name in the result table
 type = "force_coefficient"
-boundary = "wing"                 # required, str — name of the boundary zone
+boundary = "wing"                 # required, str — boundary zone LABEL in setup.xml
 direction = [1.0, 0.0, 0.0]       # required, list[float] length 3 — projection axis
 ref_area = 1.5                    # required, float > 0
 ref_velocity = 30.0               # required, float > 0
@@ -115,23 +115,39 @@ aggregate = "mean_last_10pct"     # optional, default "mean_last_10pct"
 2. `postprocess` reads that CSV, aggregates over the requested time window,
    projects onto `direction` and normalizes by `0.5 * ref_density * ref_velocity^2 * ref_area`.
 
-**Required setup activation (v9)** — `force_coefficient` needs three boundary
-fields recorded by code_saturne: `stress`, `stress_normal`, `stress_tangential`.
-**csauto activates them automatically** at `prepare` time by toggling
+**Boundary name gotcha** — `boundary` must be the **zone label** as it appears
+in `<boundary label="...">` in setup.xml (the human-friendly name attached to
+the zone), not the geometric *selection criterion* (groups like `"WALL_TOP"` or
+`"INLET_left"`) nor the mesh-side group name. If the C++ helper cannot find the
+zone, it prints once:
+```
+[csauto] force_coefficient: boundary zone "X" not found. Check setup.xml —
+the name must match the zone label (not a geom selection criterion / group).
+Skipping.
+```
+and no force CSV is produced for that boundary.
+
+**Required setup activation (v9)** — `force_coefficient` needs the boundary
+property `stress` (the wall traction vector σ·n) recorded by code_saturne.
+**csauto activates it automatically** at `prepare` time by toggling
 `<postprocessing_recording status="off"/>` to `"on"` inside the matching
-`<property>` blocks of every `caseXXXX/DATA/setup.xml`. There is no manual
-click in the code_saturne GUI to do.
+`<property name="stress">` block of every `caseXXXX/DATA/setup.xml`. There is
+no manual click in the code_saturne GUI to do.
 
-If a property tag is missing from your template setup.xml entirely, csauto
-prints a warning during `prepare` pointing to the impacted case — that case
-will not produce a force CSV at runtime. Add the missing `<property>` to your
-template setup and re-run prepare.
+The normal and tangential components written to the CSV (`Fn`, `Ftx/y/z`) are
+**computed by the C++ helper from `boundary_stress` and the local face normal**,
+not read from code_saturne's `stress_normal`/`stress_tangential` post-processing
+fields (which are not exposed in the runtime field registry as of v9).
 
-If the user later disables one of these fields by hand (e.g. by re-saving the
-setup with the GUI), the C++ helper detects the missing field at runtime,
-prints a single stderr warning identifying the boundary, and skips silently.
-The CSV will not be created and `postprocess` will fail with a clear "CSV not
-found" error.
+If `<property name="stress">` is missing from your template setup.xml entirely,
+csauto prints a warning during `prepare` pointing to the impacted case — that
+case will not produce a force CSV at runtime. Add the missing `<property>` to
+your template setup and re-run prepare.
+
+If the user later disables the field by hand (e.g. by re-saving the setup with
+the GUI), the C++ helper detects the missing field at runtime, prints a single
+stderr warning identifying the boundary, and skips silently. The CSV will not
+be created and `postprocess` will fail with a clear "CSV not found" error.
 
 **Units assumption** — the helper assumes the three stress fields are wall
 tractions expressed in Pa (N/m²) and multiplies by `b_face_surf` to obtain

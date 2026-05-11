@@ -31,23 +31,24 @@ def _make_recipe(**overrides: object) -> Recipe:
 
 
 def _write_csv(case_dir: Path, boundary: str, rows: list[tuple[float, ...]]) -> Path:
-    """Write a CSV in the new v9 schema: t, Fx, Fy, Fz, Fnx, Fny, Fnz, Ftx, Fty, Ftz.
+    """Write a CSV in the v9 schema: t, Fx, Fy, Fz, Fn, Ftx, Fty, Ftz.
 
-    Each row is the time followed by 9 force components (total, normal, tangential).
-    Tests that only care about the total can pass 3-tuples (t, Fx, Fy, Fz) — the
-    helper zero-pads the diagnostic columns.
+    Each row is the time followed by 7 numbers: total force (3), integrated
+    normal stress magnitude (1, scalar), tangential force (3). Tests that
+    only care about the total can pass 4-tuples (t, Fx, Fy, Fz) — the helper
+    zero-pads the diagnostic columns.
     """
     csv_path = case_dir / output_csv_path(boundary)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    header = "t,Fx,Fy,Fz,Fnx,Fny,Fnz,Ftx,Fty,Ftz\n"
+    header = "t,Fx,Fy,Fz,Fn,Ftx,Fty,Ftz\n"
     padded_rows = []
     for row in rows:
         if len(row) == 4:  # t, Fx, Fy, Fz
-            padded_rows.append((*row, 0, 0, 0, 0, 0, 0))
-        elif len(row) == 10:
+            padded_rows.append((*row, 0, 0, 0, 0))
+        elif len(row) == 8:
             padded_rows.append(row)
         else:
-            raise ValueError(f"_write_csv expects 4- or 10-tuples, got {len(row)}")
+            raise ValueError(f"_write_csv expects 4- or 8-tuples, got {len(row)}")
     body = "\n".join(",".join(f"{v}" for v in row) for row in padded_rows)
     csv_path.write_text(header + body + ("\n" if body else ""), encoding="utf-8")
     return csv_path
@@ -178,11 +179,11 @@ def test_extract_projects_on_direction(tmp_path: Path) -> None:
 
 
 def test_extract_ignores_diagnostic_normal_tangential_columns(tmp_path: Path) -> None:
-    """Total Fx drives the coefficient; Fn*/Ft* travel for diagnostics but must not pollute."""
+    """Total Fx drives the coefficient; Fn (scalar) and Ft* travel for diagnostics but must not pollute."""
     case_dir = tmp_path / "case0001"
     case_dir.mkdir()
-    # Full 10-column row: total = (12, 0, 0); normal = (10, 0, 0); tangential = (2, 0, 0)
-    _write_csv(case_dir, "wing", [(0.1, 12.0, 0, 0, 10.0, 0, 0, 2.0, 0, 0)])
+    # Full 8-column row: total = (12, 0, 0); normal magnitude = 10; tangential = (2, 0, 0)
+    _write_csv(case_dir, "wing", [(0.1, 12.0, 0, 0, 10.0, 2.0, 0, 0)])
     ctx = Context(case_dir=case_dir)
     # q=0.5; Cd should use total Fx=12 -> 24, not normal (20) nor tangential (4)
     assert ForceCoefficientExtractor().extract(ctx, _make_recipe(aggregate="final")) == {"Cd": pytest.approx(24.0)}

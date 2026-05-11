@@ -49,10 +49,21 @@ from ..registry import register
 
 _DEFAULT_AGGREGATE = "mean_last_10pct"
 _AGGREGATE_PCT_RE = re.compile(r"^mean_last_(\d+)pct$")
-# Total force, normal component, tangential component — 9 components per row.
-_FORCE_COMPONENT_COLUMNS = ("Fx", "Fy", "Fz", "Fnx", "Fny", "Fnz", "Ftx", "Fty", "Ftz")
+# CSV schema written by the C++ helper: 8 numeric columns + time.
+#   total force (3 components) + integrated normal magnitude (scalar) +
+#   tangential force (3 components).
+# code_saturne v9 exposes boundary_stress_normal as a SCALAR field; we keep
+# that convention rather than expanding to a vector.
+_FORCE_COMPONENT_COLUMNS = ("Fx", "Fy", "Fz", "Fn", "Ftx", "Fty", "Ftz")
 _TOTAL_FORCE_COLUMNS = ("Fx", "Fy", "Fz")
 _NON_IDENT_RE = re.compile(r"[^A-Za-z0-9_]")
+
+# Runtime field names in code_saturne v9. The setup.xml uses the short forms
+# ("stress", "stress_normal", "stress_tangential") in <property name=...>;
+# the runtime API exposes them prefixed with "boundary_".
+_FIELD_STRESS = "boundary_stress"
+_FIELD_STRESS_NORMAL = "boundary_stress_normal"
+_FIELD_STRESS_TANGENTIAL = "boundary_stress_tangential"
 
 _HELPER_TEMPLATE = Template(
     r"""static void
@@ -61,51 +72,70 @@ ${helper_name}(cs_domain_t *domain)
   const cs_mesh_quantities_t *mq = domain->mesh_quantities;
 
   const cs_zone_t *z = cs_boundary_zone_by_name_try("${boundary}");
-  if (z == nullptr)
+  if (z == nullptr) {
+    static bool zone_warned = false;
+    if (cs_glob_rank_id <= 0 && !zone_warned) {
+      zone_warned = true;
+      std::fprintf(stderr,
+                   "[csauto] force_coefficient: boundary zone "
+                   "\"${boundary}\" not found. Check setup.xml — the "
+                   "name must match the zone label (not a geom "
+                   "selection criterion / group). Skipping.\n");
+    }
     return;
+  }
 
-  /* These three boundary fields must be activated in the setup. csauto's
-     prepare step toggles their postprocessing_recording on automatically;
-     the runtime check below is a safety net if the user later disables
-     them by hand. */
-  const cs_field_t *f_stress  = cs_field_by_name_try("stress");
-  const cs_field_t *f_normal  = cs_field_by_name_try("stress_normal");
-  const cs_field_t *f_tangent = cs_field_by_name_try("stress_tangential");
-  if (f_stress == nullptr || f_normal == nullptr || f_tangent == nullptr) {
+  /* In code_saturne v9, only the total wall traction is exposed as a
+     persistent field. The "stress_normal" and "stress_tangential"
+     post-processing quantities are computed on-the-fly for visualization
+     and are not in the field registry, so csauto computes them in-place
+     from boundary_stress + the local face normal. */
+  const cs_field_t *f_stress = cs_field_by_name_try("boundary_stress");
+  if (f_stress == nullptr) {
     static bool warned = false;
     if (cs_glob_rank_id <= 0 && !warned) {
       warned = true;
       std::fprintf(stderr,
                    "[csauto] force_coefficient helper for boundary "
-                   "\"${boundary}\" requires fields 'stress', "
-                   "'stress_normal' and 'stress_tangential' to be enabled "
-                   "on the boundary. Skipping.\n");
+                   "\"${boundary}\" requires the 'stress' boundary "
+                   "property to be enabled in setup.xml. Skipping.\n");
     }
     return;
   }
 
-  /* Assumption: Stress / stress_normal / stress_tangential are wall tractions
-     in Pa (N/m^2). We integrate over the patch by multiplying by face area. */
+  /* Assumption: boundary_stress is the wall traction in Pa (N/m^2).
+     Integrate over the patch by multiplying by face area; decompose
+     into normal (scalar magnitude along outward normal) and tangential
+     (3-D vector in the tangent plane) using the local face normal. */
   cs_real_t F[3]  = {0.0, 0.0, 0.0};
-  cs_real_t Fn[3] = {0.0, 0.0, 0.0};
+  cs_real_t Fn    = 0.0;
   cs_real_t Ft[3] = {0.0, 0.0, 0.0};
 
   for (cs_lnum_t i = 0; i < z->n_elts; i++) {
     const cs_lnum_t  face_id = z->elt_ids[i];
     const cs_real_t  area    = mq->b_face_surf[face_id];
-    const cs_real_t *s_tot   = f_stress->val  + 3 * face_id;
-    const cs_real_t *s_nrm   = f_normal->val  + 3 * face_id;
-    const cs_real_t *s_tan   = f_tangent->val + 3 * face_id;
+    const cs_real_t *n_a     = mq->b_face_normal + 3 * face_id;  /* normal * area */
+    const cs_real_t *s_tot   = f_stress->val + 3 * face_id;
 
+    /* Unit outward normal (b_face_normal has length = area). */
+    const cs_real_t inv_a = (area > 0.0) ? 1.0 / area : 0.0;
+    const cs_real_t n_unit[3] = {n_a[0] * inv_a, n_a[1] * inv_a, n_a[2] * inv_a};
+    const cs_real_t sn = s_tot[0] * n_unit[0] + s_tot[1] * n_unit[1] + s_tot[2] * n_unit[2];
+    const cs_real_t s_tan[3] = {
+      s_tot[0] - sn * n_unit[0],
+      s_tot[1] - sn * n_unit[1],
+      s_tot[2] - sn * n_unit[2],
+    };
+
+    Fn += sn * area;
     for (int j = 0; j < 3; j++) {
       F[j]  += s_tot[j] * area;
-      Fn[j] += s_nrm[j] * area;
       Ft[j] += s_tan[j] * area;
     }
   }
 
   cs_parall_sum(3, CS_REAL_TYPE, F);
-  cs_parall_sum(3, CS_REAL_TYPE, Fn);
+  cs_parall_sum(1, CS_REAL_TYPE, &Fn);
   cs_parall_sum(3, CS_REAL_TYPE, Ft);
 
   if (cs_glob_rank_id <= 0) {
@@ -114,14 +144,14 @@ ${helper_name}(cs_domain_t *domain)
       fp = std::fopen("${output_csv}", "w");
       if (fp != nullptr)
         std::fprintf(fp,
-                     "t,Fx,Fy,Fz,Fnx,Fny,Fnz,Ftx,Fty,Ftz\n");
+                     "t,Fx,Fy,Fz,Fn,Ftx,Fty,Ftz\n");
     }
     if (fp != nullptr) {
       std::fprintf(fp,
-                   "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
+                   "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
                    cs_glob_time_step->t_cur,
                    F[0],  F[1],  F[2],
-                   Fn[0], Fn[1], Fn[2],
+                   Fn,
                    Ft[0], Ft[1], Ft[2]);
       std::fflush(fp);
     }
@@ -196,8 +226,12 @@ class ForceCoefficientExtractor:
         return [CppHelper(name=helper_name(boundary), code=render_helper(boundary))]
 
     def required_setup_properties(self, recipe: Recipe) -> list[str]:
-        """Boundary fields csauto activates in setup.xml at prepare time."""
-        return ["stress", "stress_normal", "stress_tangential"]
+        """Boundary fields csauto activates in setup.xml at prepare time.
+
+        Only the total stress is needed; csauto computes normal and tangential
+        components in C++ from the local face normal — see render_helper().
+        """
+        return ["stress"]
 
 
 # --- Validation helpers -----------------------------------------------------

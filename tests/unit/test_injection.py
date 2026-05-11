@@ -58,17 +58,27 @@ def test_inject_into_case_returns_none_with_empty_recipes(tmp_path: Path) -> Non
     assert not (case_dir / "SRC" / "cs_user_extra_operations.cpp").exists()
 
 
+_USER_DEFINITION = (
+    '#include "cs_headers.h"\n'
+    "\n"
+    "void cs_user_extra_operations(cs_domain_t *domain)\n"
+    "{\n"
+    "  /* hand-written by an engineer */\n"
+    "}\n"
+)
+
+
 def test_inject_into_case_refuses_existing_user_authored_file(tmp_path: Path) -> None:
     case_dir = _make_case(tmp_path)
     src = case_dir / "SRC"
     src.mkdir()
     pre_existing = src / "cs_user_extra_operations.cpp"
-    pre_existing.write_text("// hand-written by an engineer\nvoid cs_user_extra_operations() {}\n", encoding="utf-8")
+    pre_existing.write_text(_USER_DEFINITION, encoding="utf-8")
 
-    with pytest.raises(QoIError, match="User file already present"):
+    with pytest.raises(QoIError, match=r"already defined in cs_user_extra_operations\.cpp"):
         inject_user_files_into_case(case_dir, [_force_recipe()])
     # And the file must be untouched.
-    assert pre_existing.read_text(encoding="utf-8").startswith("// hand-written")
+    assert "hand-written by an engineer" in pre_existing.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("extension", [".c", ".cc", ".cxx"])
@@ -77,9 +87,90 @@ def test_inject_into_case_refuses_user_file_with_alternate_extension(tmp_path: P
     src = case_dir / "SRC"
     src.mkdir()
     pre_existing = src / f"cs_user_extra_operations{extension}"
-    pre_existing.write_text("// hand-written\n", encoding="utf-8")
-    with pytest.raises(QoIError, match="User file already present"):
+    pre_existing.write_text(_USER_DEFINITION, encoding="utf-8")
+    with pytest.raises(QoIError, match="already defined in"):
         inject_user_files_into_case(case_dir, [_force_recipe()])
+
+
+def test_inject_into_case_refuses_when_function_defined_in_another_file(tmp_path: Path) -> None:
+    """The function is allowed in any *.cpp under SRC/; csauto must still detect it.
+
+    Reproduces the real-world bug where a template's cs_user_source_terms.cpp
+    also defined cs_user_extra_operations, causing a link-time duplicate symbol.
+    """
+    case_dir = _make_case(tmp_path)
+    src = case_dir / "SRC"
+    src.mkdir()
+    source_terms = src / "cs_user_source_terms.cpp"
+    source_terms.write_text(
+        '#include "cs_headers.h"\n'
+        "\n"
+        "void cs_user_extra_operations(cs_domain_t *domain)\n"
+        "{\n"
+        "  /* historical: lives here for legacy reasons */\n"
+        "}\n"
+        "\n"
+        "void cs_user_source_terms(cs_domain_t *domain, int field_id, cs_real_t *st_exp, cs_real_t *st_imp)\n"
+        "{\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(QoIError, match=r"already defined in cs_user_source_terms\.cpp"):
+        inject_user_files_into_case(case_dir, [_force_recipe()])
+    # No csauto file must have been written.
+    assert not (src / "cs_user_extra_operations.cpp").exists()
+
+
+def test_inject_ignores_function_call_in_other_file(tmp_path: Path) -> None:
+    """A call site (not a definition) must NOT trigger the conflict guard."""
+    case_dir = _make_case(tmp_path)
+    src = case_dir / "SRC"
+    src.mkdir()
+    (src / "cs_user_initialization.cpp").write_text(
+        '#include "cs_headers.h"\n'
+        "\n"
+        "void cs_user_initialization(cs_domain_t *domain)\n"
+        "{\n"
+        "  cs_user_extra_operations(domain);  /* legit call site */\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    target = inject_user_files_into_case(case_dir, [_force_recipe()])
+    assert target is not None
+    assert target.is_file()
+
+
+def test_inject_ignores_mentions_in_comments(tmp_path: Path) -> None:
+    """A comment mentioning cs_user_extra_operations must NOT block injection."""
+    case_dir = _make_case(tmp_path)
+    src = case_dir / "SRC"
+    src.mkdir()
+    (src / "cs_user_boundary_conditions.cpp").write_text(
+        '#include "cs_headers.h"\n'
+        "\n"
+        "/* This file works together with cs_user_extra_operations(cs_domain_t *) {\n"
+        "   ...which lives in another file. */\n"
+        "\n"
+        "void cs_user_boundary_conditions_setup(void) {}\n",
+        encoding="utf-8",
+    )
+    target = inject_user_files_into_case(case_dir, [_force_recipe()])
+    assert target is not None
+    assert target.is_file()
+
+
+def test_inject_ignores_forward_declaration(tmp_path: Path) -> None:
+    """A forward declaration (no body) must NOT count as a definition."""
+    case_dir = _make_case(tmp_path)
+    src = case_dir / "SRC"
+    src.mkdir()
+    (src / "cs_user_headers.cpp").write_text(
+        '#include "cs_headers.h"\n\nvoid cs_user_extra_operations(cs_domain_t *domain);   /* fwd decl */\n',
+        encoding="utf-8",
+    )
+    target = inject_user_files_into_case(case_dir, [_force_recipe()])
+    assert target is not None
+    assert target.is_file()
 
 
 def test_inject_into_case_overwrites_previously_csauto_managed_file(tmp_path: Path) -> None:
@@ -131,10 +222,10 @@ def test_inject_into_runs_stops_on_first_conflict(tmp_path: Path) -> None:
     case2 = runs / "case0002"
     case2.mkdir()
     (case2 / "SRC").mkdir()
-    (case2 / "SRC" / "cs_user_extra_operations.cpp").write_text("// hand-written\n", encoding="utf-8")
+    (case2 / "SRC" / "cs_user_extra_operations.cpp").write_text(_USER_DEFINITION, encoding="utf-8")
     (runs / "case0003").mkdir()
 
-    with pytest.raises(QoIError, match="User file already present"):
+    with pytest.raises(QoIError, match="already defined in"):
         inject_user_files_into_runs(runs, [_force_recipe()])
     # case0001 was processed before the conflict; case0003 must not have been touched.
     assert (runs / "case0001" / "SRC" / "cs_user_extra_operations.cpp").is_file()

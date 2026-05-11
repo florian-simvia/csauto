@@ -82,14 +82,14 @@ _SETUP_TEMPLATE_NO_STRESS = """\
 
 def test_collect_required_properties_for_force_coefficient() -> None:
     props = collect_required_properties([_force_recipe()])
-    assert props == ["stress", "stress_normal", "stress_tangential"]
+    assert props == ["stress"]
 
 
 def test_collect_required_properties_dedupes_across_recipes() -> None:
-    # Two force_coefficient recipes ask for the same 3 fields — collected once.
+    # Two force_coefficient recipes ask for the same field — collected once.
     recipes = [_force_recipe("wing"), _force_recipe("fuselage")]
     props = collect_required_properties(recipes)
-    assert props == ["stress", "stress_normal", "stress_tangential"]
+    assert props == ["stress"]
 
 
 def test_collect_required_properties_skips_extractors_without_method(
@@ -204,7 +204,7 @@ def test_patch_setup_for_recipes_walks_every_case(tmp_path: Path) -> None:
 
     reports = patch_setup_for_recipes(runs, [_force_recipe()])
     assert {r.case_dir.name for r in reports} == {"case0001", "case0002", "case0003"}
-    assert all(r.enabled == ["stress", "stress_normal", "stress_tangential"] for r in reports)
+    assert all(r.enabled == ["stress"] for r in reports)
 
 
 def test_patch_setup_for_recipes_empty_recipes_is_noop(tmp_path: Path) -> None:
