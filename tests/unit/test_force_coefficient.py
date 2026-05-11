@@ -193,8 +193,31 @@ def test_extract_missing_csv_raises(tmp_path: Path) -> None:
     case_dir = tmp_path / "case0001"
     case_dir.mkdir()
     ctx = Context(case_dir=case_dir)
-    with pytest.raises(QoIError, match="CSV not found"):
+    with pytest.raises(QoIError, match="no RESU run found"):
         ForceCoefficientExtractor().extract(ctx, _make_recipe())
+
+
+def test_extract_csv_missing_in_existing_resu_raises(tmp_path: Path) -> None:
+    """A RESU run that didn't produce the force CSV yields a targeted error."""
+    case_dir = tmp_path / "case0001"
+    (case_dir / "RESU" / "20260101-1200" / "monitoring").mkdir(parents=True)
+    ctx = Context(case_dir=case_dir)
+    with pytest.raises(QoIError, match="CSV not found for boundary 'wing'"):
+        ForceCoefficientExtractor().extract(ctx, _make_recipe())
+
+
+def test_extract_finds_csv_in_latest_resu(tmp_path: Path) -> None:
+    """Falls back to looking inside RESU/<latest>/monitoring/ when present."""
+    case_dir = tmp_path / "case0001"
+    monitoring = case_dir / "RESU" / "20260101-1200" / "monitoring"
+    monitoring.mkdir(parents=True)
+    (monitoring / "csauto_forces_wing.csv").write_text(
+        "t,Fx,Fy,Fz,Fn,Ftx,Fty,Ftz\n0.1,12.0,0,0,-12.0,0,0,0\n",
+        encoding="utf-8",
+    )
+    ctx = Context(case_dir=case_dir)
+    result = ForceCoefficientExtractor().extract(ctx, _make_recipe(aggregate="final"))
+    assert result == {"Cd": pytest.approx(24.0)}
 
 
 def test_extract_header_only_csv_raises(tmp_path: Path) -> None:

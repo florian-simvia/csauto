@@ -237,6 +237,29 @@ def parse_arguments(
     doctor_parser = subparsers.add_parser("doctor", help="Check configuration and cases.")
     doctor_parser.add_argument("runs_dir", type=Path, help="Directory containing generated cases")
 
+    postprocess_parser = subparsers.add_parser(
+        "postprocess",
+        help="Run all configured [[qoi]] extractors and write a campaign-level table.",
+    )
+    postprocess_parser.add_argument("runs_dir", type=Path, help="Directory containing generated cases")
+    postprocess_parser.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output file path. Format inferred from the extension (.csv, .tsv, .json).",
+    )
+    postprocess_parser.add_argument(
+        "--format",
+        choices=("csv", "tsv", "json"),
+        default=None,
+        help="Override the output format detection.",
+    )
+    postprocess_parser.add_argument(
+        "--cases",
+        default=None,
+        help="Comma-separated case IDs to include (e.g. case0001,case0002). Default: all.",
+    )
+
     cleanup_parser = subparsers.add_parser("cleanup", help="Clean up runs (RESU/logs/cache).")
     cleanup_parser.add_argument("runs_dir", type=Path, help="Directory containing generated cases")
     cleanup_parser.add_argument(
@@ -438,6 +461,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if _print_doctor(items):
                 return 1
+        elif args.command == "postprocess":
+            from .qoi.postprocess import extract_runs_qois, write_table
+
+            if not config.qoi_recipes:
+                print("No [[qoi]] recipes configured in csauto.toml — nothing to extract.")
+                return 0
+            cases_filter = [c.strip() for c in args.cases.split(",") if c.strip()] if args.cases else None
+            results = extract_runs_qois(args.runs_dir, config.qoi_recipes, cases=cases_filter)
+            if not results:
+                print(f"No cases matched under {args.runs_dir}.")
+                return 0
+            write_table(results, args.out, format=args.format)
+            n_total = len(results)
+            n_errors = sum(1 for r in results if r.errors)
+            print(f"Wrote {n_total} row(s) to {args.out}")
+            if n_errors:
+                print(f"  ({n_errors} case(s) had at least one extractor error — see _errors column)")
         elif args.command == "cleanup":
             if not (args.prune_resu or args.max_log_mb > 0 or args.clear_cid or args.clear_pyc):
                 print("No action specified. Use --prune-resu/--max-log-mb/--clear-cid/--clear-pyc.")

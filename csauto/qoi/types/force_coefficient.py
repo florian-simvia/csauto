@@ -204,7 +204,7 @@ class ForceCoefficientExtractor:
 
     def extract(self, ctx: Context, recipe: Recipe) -> dict[str, float]:
         boundary = str(recipe.params["boundary"])
-        csv_path = ctx.case_dir / output_csv_path(boundary)
+        csv_path = _resolve_force_csv(ctx.case_dir, boundary)
         rows = _read_force_csv(csv_path)
         mode = recipe.params.get("aggregate", _DEFAULT_AGGREGATE)
         aggregated = _aggregate_rows(rows, mode)
@@ -277,9 +277,46 @@ def _validate_aggregate_mode(mode: Any, recipe_name: str) -> None:
 # --- CSV / aggregation helpers ----------------------------------------------
 
 
+def _resolve_force_csv(case_dir: Path, boundary: str) -> Path:
+    """Find the per-case force CSV produced by the C++ helper.
+
+    code_saturne writes it under ``case_dir/RESU/<run_id>/monitoring/`` (one
+    run_id per simulation). We pick the most recent RESU subdirectory by
+    mtime. The legacy ``case_dir/monitoring/`` path is kept as a fallback for
+    tests and for direct helper invocations outside the standard run pipeline.
+
+    Raises QoIError with an actionable message when no candidate exists.
+    """
+    rel = output_csv_path(boundary)
+    resu_root = case_dir / "RESU"
+    resu_subdirs: list[Path] = []
+    if resu_root.is_dir():
+        resu_subdirs = sorted(
+            (d for d in resu_root.iterdir() if d.is_dir()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for run_dir in resu_subdirs:
+            candidate = run_dir / rel
+            if candidate.is_file():
+                return candidate
+    direct = case_dir / rel
+    if direct.is_file():
+        return direct
+    if not resu_subdirs:
+        raise QoIError(
+            f"force_coefficient: no RESU run found under {case_dir.name}/RESU/ "
+            f"(case has not been launched yet, or all runs were cleaned)."
+        )
+    raise QoIError(
+        f"force_coefficient: CSV not found for boundary {boundary!r} in latest "
+        f"RESU {resu_subdirs[0].name} of {case_dir.name}. Check the C++ helper "
+        f"ran (look for [csauto] in run_solver.log) and the boundary name "
+        f"matches the zone label in setup.xml."
+    )
+
+
 def _read_force_csv(path: Path) -> list[dict[str, float]]:
-    if not path.is_file():
-        raise QoIError(f"force_coefficient: CSV not found: {path}")
     rows: list[dict[str, float]] = []
     with path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
