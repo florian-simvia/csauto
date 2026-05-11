@@ -260,6 +260,19 @@ th.status-sortable:hover {
   max-width: 360px;
 }
 
+/* Status table: cap visible body rows to exactly 10 (header pinned via
+   th { position: sticky; top: 0 }). Force a uniform tr height so the math holds
+   regardless of cell content. */
+#status-table thead tr,
+#status-table tbody tr {
+  height: 34px;
+}
+#status-table-wrap {
+  /* 1 header + 10 body rows = 11 * 34px = 374px */
+  max-height: calc(34px * 11);
+  overflow-y: auto;
+}
+
 /* Sticky columns */
 #status-table-wrap.sticky-enabled th.sticky-left,
 #status-table-wrap.sticky-enabled th.sticky-right {
