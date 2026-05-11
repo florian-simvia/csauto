@@ -29,6 +29,7 @@ class Config:
     api_token: str | None = None
     path: Path | None = None
     qoi_recipes: list[Recipe] = field(default_factory=list)
+    qoi_mode: str = "managed"
 
 
 def _coerce_str(value: Any, default: str) -> str:
@@ -184,7 +185,18 @@ def load_config(path: Path | None = None) -> Config:
     qoi_section = data.get("qoi")
     if qoi_section is not None:
         config.qoi_recipes = _parse_qoi_recipes(qoi_section, config_path=config_path)
+    if "qoi_mode" in data:
+        config.qoi_mode = _parse_qoi_mode(data.get("qoi_mode"), config_path=config_path)
     return config
+
+
+def _parse_qoi_mode(value: Any, *, config_path: Path) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"Invalid qoi_mode in {config_path}: expected string, got {type(value).__name__}")
+    mode = value.strip().lower()
+    if mode not in {"managed", "injected"}:
+        raise ValueError(f"Invalid qoi_mode in {config_path}: {value!r} (expected 'managed' or 'injected')")
+    return mode
 
 
 def _parse_qoi_recipes(value: Any, *, config_path: Path) -> list[Recipe]:

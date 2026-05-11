@@ -375,19 +375,43 @@ def main(argv: Sequence[str] | None = None) -> int:
                 from .qoi.setup_patcher import patch_setup_for_recipes
                 from .warn import warn
 
-                written = inject_user_files_into_runs(args.output_root, config.qoi_recipes)
-                if written:
-                    print(f"Injected QoI user file in {len(written)} case(s)")
+                inj_reports = inject_user_files_into_runs(args.output_root, config.qoi_recipes, mode=config.qoi_mode)
+                n_injected = sum(1 for r in inj_reports if r.files_written)
+                if n_injected:
+                    if config.qoi_mode == "managed":
+                        print(f"Injected QoI user file in {n_injected} case(s)")
+                    else:
+                        print(
+                            f"Wrote csauto QoI files (injected mode) in {n_injected} case(s): "
+                            f"cs_user_csauto_qoi.cpp + .h"
+                        )
+                        needs_action = [r for r in inj_reports if r.needs_user_action]
+                        if needs_action:
+                            sample = needs_action[0]
+                            target = (
+                                sample.user_file_with_extra_ops.name
+                                if sample.user_file_with_extra_ops is not None
+                                else "cs_user_extra_operations.cpp (to create)"
+                            )
+                            warn(
+                                f"Injected mode: add the dispatch call inside "
+                                f"cs_user_extra_operations (e.g. {target} in case "
+                                f"{sample.case_dir.name}). Insert this in your function:\n\n"
+                                f'    #include "cs_user_csauto_qoi.h"\n'
+                                f"    ...\n"
+                                f"    csauto_qoi_dispatch(domain);   // csauto: required for QoI extraction\n\n"
+                                f"{len(needs_action)} case(s) need this fix."
+                            )
                 reports = patch_setup_for_recipes(args.output_root, config.qoi_recipes)
                 n_changed = sum(1 for r in reports if r.changed)
                 if n_changed:
                     print(f"Enabled QoI boundary fields in setup.xml for {n_changed} case(s)")
                 missing_by_case = {r.case_dir.name: r.missing for r in reports if r.missing}
                 if missing_by_case:
-                    sample = next(iter(missing_by_case.items()))
+                    sample_setup = next(iter(missing_by_case.items()))
                     warn(
-                        f"setup.xml is missing <property> tags for: {', '.join(sample[1])} "
-                        f"(e.g. case {sample[0]}). QoI extraction will fail at runtime. "
+                        f"setup.xml is missing <property> tags for: {', '.join(sample_setup[1])} "
+                        f"(e.g. case {sample_setup[0]}). QoI extraction will fail at runtime. "
                         f"Activate these fields in your template setup before re-running prepare."
                     )
             if getattr(args, "test_compile", False):
