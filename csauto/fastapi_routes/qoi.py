@@ -9,7 +9,7 @@ restarting the server.
 from __future__ import annotations
 
 import math
-from typing import Annotated, Any
+from typing import Any
 
 from ..config import load_config
 from ..qoi.errors import QoIError
@@ -46,8 +46,8 @@ def register_qoi_routes(app: Any, ctx: Any, components: dict[str, Any]) -> None:
 
     @app.get("/api/qoi/results", response_model=QoIResultsResponse)
     def get_qoi_results(
-        x_csauto_token: Annotated[str | None, Header(alias="X-CSAUTO-TOKEN")] = None,
-        authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+        x_csauto_token: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> QoIResultsResponse:
         ctx.require_auth(x_csauto_token, authorization)
 
