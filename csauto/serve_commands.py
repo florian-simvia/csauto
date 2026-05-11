@@ -46,6 +46,7 @@ def _serve_common_prechecks(
             check_display=True,
             require_write=True,
             check_setup=True,
+            qoi_recipes=config.qoi_recipes,
         )
         if print_doctor(items):
             raise ValueError("Pre-check failed.")

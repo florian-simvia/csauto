@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from .qoi import Recipe, parse_recipe
+from .qoi.errors import RecipeError
 
 try:
     import tomllib
@@ -25,6 +28,7 @@ class Config:
     port: int = 8000
     api_token: str | None = None
     path: Path | None = None
+    qoi_recipes: list[Recipe] = field(default_factory=list)
 
 
 def _coerce_str(value: Any, default: str) -> str:
@@ -177,7 +181,28 @@ def load_config(path: Path | None = None) -> Config:
     token = api_section.get("token") if isinstance(api_section, dict) else None
     if token is not None:
         config.api_token = _coerce_str(token, "").strip() or None
+    qoi_section = data.get("qoi")
+    if qoi_section is not None:
+        config.qoi_recipes = _parse_qoi_recipes(qoi_section, config_path=config_path)
     return config
+
+
+def _parse_qoi_recipes(value: Any, *, config_path: Path) -> list[Recipe]:
+    if not isinstance(value, list):
+        raise ValueError(f"Invalid [[qoi]] in {config_path}: expected an array of tables, got {type(value).__name__}")
+    recipes: list[Recipe] = []
+    seen_names: set[str] = set()
+    for index, entry in enumerate(value):
+        source = f"[[qoi]] #{index + 1} in {config_path}"
+        try:
+            recipe = parse_recipe(entry, source=source)
+        except RecipeError as exc:
+            raise ValueError(str(exc)) from exc
+        if recipe.name in seen_names:
+            raise ValueError(f"Duplicate QoI name {recipe.name!r} in {config_path}")
+        seen_names.add(recipe.name)
+        recipes.append(recipe)
+    return recipes
 
 
 __all__ = ["Config", "find_config", "load_config"]

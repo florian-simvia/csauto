@@ -359,6 +359,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     saturne_bin=runtime_selection.saturne_bin,
                     singularity_image=runtime_selection.singularity_image,
                     singularity_bin=runtime_selection.singularity_bin,
+                    qoi_recipes=config.qoi_recipes,
                 )
                 if _print_doctor(items):
                     raise ValueError("Pre-check failed.")
@@ -413,6 +414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 saturne_bin=config.saturne_bin,
                 singularity_image=config.singularity_image,
                 singularity_bin=config.singularity_bin,
+                qoi_recipes=config.qoi_recipes,
             )
             if _print_doctor(items):
                 return 1

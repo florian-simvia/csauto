@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from csauto.maintenance import cleanup_runs, run_doctor
+from csauto.qoi import Recipe
 
 
 def _make_runs_dir(tmp_path: Path) -> Path:
@@ -478,3 +479,63 @@ def test_cleanup_runs_unlinks_symlink_without_following_target(tmp_path: Path) -
     assert real_resu.is_dir()
     assert sentinel.read_text(encoding="utf-8") == "data"
     assert report.resu_removed == 1
+
+
+# --- QoI v9 version gating --------------------------------------------------
+
+
+def _patch_detect_version(monkeypatch: pytest.MonkeyPatch, version: tuple[int, ...] | None) -> None:
+    monkeypatch.setattr(
+        "csauto.maintenance.detect_saturne_version",
+        lambda _bin=None: version,
+    )
+
+
+def test_doctor_no_recipes_skips_qoi_version_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_dir = _make_runs_dir(tmp_path)
+    _add_case(runs_dir, "case0001")
+    _patch_detect_version(monkeypatch, (8, 3))  # old version, but no recipes
+
+    items = run_doctor(runs_dir, check_display=False, qoi_recipes=None)
+    assert not any("QoI" in item.message or "qoi" in item.message for item in items)
+
+
+def test_doctor_empty_recipes_skips_qoi_version_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_dir = _make_runs_dir(tmp_path)
+    _add_case(runs_dir, "case0001")
+    _patch_detect_version(monkeypatch, (8, 3))
+
+    items = run_doctor(runs_dir, check_display=False, qoi_recipes=[])
+    assert not any("QoI" in item.message or "qoi" in item.message for item in items)
+
+
+def test_doctor_recipes_with_v9_reports_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_dir = _make_runs_dir(tmp_path)
+    _add_case(runs_dir, "case0001")
+    _patch_detect_version(monkeypatch, (9, 0, 1))
+    recipes = [Recipe(name="Cd", type="force_coefficient")]
+
+    items = run_doctor(runs_dir, check_display=False, qoi_recipes=recipes)
+    assert _has_item(items, "ok", "code_saturne 9.0.1")
+    assert _has_item(items, "ok", "QoI extraction supported")
+
+
+def test_doctor_recipes_with_old_version_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_dir = _make_runs_dir(tmp_path)
+    _add_case(runs_dir, "case0001")
+    _patch_detect_version(monkeypatch, (8, 3))
+    recipes = [Recipe(name="Cd", type="force_coefficient")]
+
+    items = run_doctor(runs_dir, check_display=False, qoi_recipes=recipes)
+    assert _has_item(items, "fail", "code_saturne 8.3 detected")
+    assert _has_item(items, "fail", "requires >= 9.0")
+
+
+def test_doctor_recipes_with_unknown_version_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_dir = _make_runs_dir(tmp_path)
+    _add_case(runs_dir, "case0001")
+    _patch_detect_version(monkeypatch, None)
+    recipes = [Recipe(name="Cd", type="force_coefficient")]
+
+    items = run_doctor(runs_dir, check_display=False, qoi_recipes=recipes)
+    assert _has_item(items, "warn", "version could not be detected")

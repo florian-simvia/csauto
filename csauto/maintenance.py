@@ -7,6 +7,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .qoi import MIN_SATURNE_VERSION, Recipe, detect_saturne_version, is_compatible
+from .qoi.version import format_version
 from .template import find_setup_file
 from .web_support import is_within_root
 
@@ -47,6 +49,7 @@ def run_doctor(
     saturne_bin: str | None = None,
     singularity_image: str | None = None,
     singularity_bin: str | None = None,
+    qoi_recipes: Sequence[Recipe] | None = None,
 ) -> list[DoctorItem]:
     items: list[DoctorItem] = []
 
@@ -153,8 +156,41 @@ def run_doctor(
                 add("warn", "DISPLAY is set but /tmp/.X11-unix is missing")
 
     _check_web_deps(add)
+    _check_qoi_version_gate(add, qoi_recipes, saturne_bin)
 
     return items
+
+
+def _check_qoi_version_gate(
+    add: object,
+    qoi_recipes: Sequence[Recipe] | None,
+    saturne_bin: str | None,
+) -> None:
+    """Validate that code_saturne is recent enough when QoI recipes are configured.
+
+    No-op if no recipes are declared. csauto itself supports older versions;
+    only the QoI auto-postprocessing feature requires code_saturne >= 9.
+    """
+    if not qoi_recipes:
+        return
+    add_item = add  # for type clarity below
+    version = detect_saturne_version(saturne_bin)
+    pretty = format_version(version)
+    min_pretty = ".".join(str(p) for p in MIN_SATURNE_VERSION)
+    if version is None:
+        add_item(
+            "warn",
+            f"[[qoi]] configured but code_saturne version could not be detected. "
+            f"QoI extraction requires >= {min_pretty}.",
+        )
+    elif is_compatible(version):
+        add_item("ok", f"code_saturne {pretty} >= {min_pretty} (QoI extraction supported)")
+    else:
+        add_item(
+            "fail",
+            f"code_saturne {pretty} detected; QoI auto-postprocessing requires >= {min_pretty}. "
+            f"Either remove [[qoi]] entries from your config or upgrade code_saturne.",
+        )
 
 
 @dataclass
