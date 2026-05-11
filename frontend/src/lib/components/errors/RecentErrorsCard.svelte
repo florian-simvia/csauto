@@ -391,7 +391,7 @@
   {/if}
 
   <div class="error-list {loading ? 'opacity-50 pointer-events-none' : ''}">
-    {#if sortedItems.length === 0 && !loading}
+    {#if sortedItems.length === 0}
       <p class="error-empty">
         No errors found. Select cases and adjust filters above.
       </p>
